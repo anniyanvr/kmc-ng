@@ -1,0 +1,72 @@
+@import 'app-theme/_variables.scss';
+
+.kLiveCaptions {
+    display: flex;
+    padding: 24px;
+    padding-top: 0px;
+    flex-direction: column;
+    .kRow {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 24px;
+        button {
+            font-weight: bold;
+        }
+    }
+    .kIndent {
+        margin-left: 24px;
+    }
+	.kTitle{
+		color: $kGrayscale1;
+		font-size: 16px;
+		font-weight: 700;
+        margin-bottom: 24px;
+	}
+    .kLabel {
+        color: $kGrayscale1;
+        font-size: 15px;
+        font-weight: 700;
+        width: 134px;
+    }
+    .kId {
+        width: 80px;
+    }
+    .kInput {
+        width: 134px;
+    }
+    .idReadOnly {
+        color: $kGrayscale3;
+        font-size: 15px;
+        font-weight: 400;
+        width: 80px;
+    }
+    .containers {
+        display: flex;
+        flex-direction: column;
+        padding-left: 24px;
+    }
+	.kError{
+		color: $kDandger;
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 24px;
+	}
+    .kRemove{
+        color: $kDandger;
+        cursor: pointer;
+        font-size: 24px;
+    }
+    ::ng-deep .p-dropdown {
+        width: 134px;
+    }
+}
+button ::ng-deep .ccIcon {
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    width: 1rem;
+    height: 1rem;
+    display: inline-block;
+    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAANtJREFUeAHtlI0NwiAQha/GAXAD3EA3qBt0A1dwA+wE7QaOoBvoCG7QbqAb4KschhBaSYqJafqSrxB+7o4XCtGsf5ICOhHKBs2cBJrS6h17QT/WtBO0YAdWYA1KZ+4CtmR87to7Rci/CTmQ4AwqXtP1G+7vwRUUQAT2DyZ48FjtjJ04eM1zjbO26kuwpLCe3ApnrPDmpLMmpwj5FQgOqrlaCY5kbCFudeBEURZZS2yFghPYIAfvFIp6LPr2J7dkbkjIhhsZuyTYBPZmn89AgjGa4FNRUjqljDVrpF79dFd0D7lIZAAAAABJRU5ErkJggg==);
+}

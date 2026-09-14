@@ -5,9 +5,10 @@ import {AppLocalization} from '@kaltura-ng/mc-shared';
 import {Task} from '../../mr-store/mr-store.service';
 import {ActionNotificationComponent} from './renderers';
 import {AppAnalytics, ButtonType} from 'app-shared/kmc-shell';
+import {KMCPermissions, KMCPermissionsService} from 'app-shared/kmc-shared/kmc-permissions';
 
 export type Action = {
-    type: 'flavours' | 'addCategory' | 'removeCategory' | 'addTags' | 'removeTags' | 'owner' | 'delete' | 'notificationHeadsUp' | 'notificationProfileScan' | 'notificationExecutionSummary' | '';
+    type: 'flavours' | 'addCategory' | 'removeCategory' | 'addTags' | 'removeTags' | 'owner' | 'delete' | 'notificationHeadsUp' | 'notificationProfileScan' | 'notificationExecutionSummary' | 'agent' | '';
     requires: 'create' | 'delete' | 'update';
     task: Task | null;
 }
@@ -34,10 +35,11 @@ export class RuleActionsComponent implements OnInit {
         for (const type of this._notificationTypes) {
             this._notifications[type] = this.actions.find(action => action.task?.taskParams?.sendNotificationTaskParams?.notificationType === type);
         };
-        this._showMessage = this.actions.filter(action => action.type === 'delete' || action.type === 'owner' || action.type === 'removeTags'
+        this._showMessage = this.actions.filter(action => action.type === 'delete' || action.type === 'owner' || action.type === 'agent' || action.type === 'removeTags'
             || action.type === 'addTags' || action.type === 'removeCategory' || action.type === 'addCategory' || action.type === 'flavours').length > 0;
     };
     @Input() selectedTab: string;
+    @Input() isLiveRule: boolean;
     @Output() onActionsChange = new EventEmitter<Action[]>();
 
     public items: MenuItem[];
@@ -48,7 +50,9 @@ export class RuleActionsComponent implements OnInit {
 
     public _notifications = {};
 
-    constructor(private _analytics: AppAnalytics, private _appLocalization: AppLocalization) {
+    constructor(private _analytics: AppAnalytics,
+                private _appLocalization: AppLocalization,
+                private permissionsService: KMCPermissionsService) {
     }
 
     ngOnInit() {
@@ -115,7 +119,21 @@ export class RuleActionsComponent implements OnInit {
                     this._analytics.trackButtonClickEvent(ButtonType.Choose, 'AM_actions_change_owner', null , 'Automation_manager');
                     this.addAction('owner');
                 }
-            },
+            }
+        ];
+        if (this.permissionsService.hasPermission(KMCPermissions.FEATURE_AGENTS_FRAMEWORK_PERMISSION)) {
+            this.items.push(
+                {
+                    label: this._appLocalization.get('applications.settings.mr.actions.agent'),
+                    disabled: this.actions.filter(action => action.type === 'agent' || action.type === 'delete').length > 0,
+                    command: () => {
+                        this._analytics.trackButtonClickEvent(ButtonType.Choose, 'AM_actions_trigger_agent', null, 'Automation_manager');
+                        this.addAction('agent');
+                    }
+                }
+            );
+        }
+        this.items.push(
             {
                 label: this._appLocalization.get('applications.settings.mr.actions.delete'),
                 disabled: this.actions.filter(action => action.type === 'delete' || action.type === 'owner' || action.type === 'removeTags'
@@ -125,7 +143,7 @@ export class RuleActionsComponent implements OnInit {
                     this.addAction('delete');
                 }
             }
-        ];
+        );
     }
 
     private getActionType(task: Task): Action['type'] {
@@ -148,6 +166,9 @@ export class RuleActionsComponent implements OnInit {
         }
         if (task.taskParams?.modifyEntryTaskParams?.kalturaEntry?.userId) {
             type = 'owner';
+        }
+        if (task.taskParams?.agentTaskParams?.agentId) {
+            type = 'agent';
         }
         if (task.taskParams?.deleteEntryTaskParams) {
             type = 'delete';
@@ -177,7 +198,7 @@ export class RuleActionsComponent implements OnInit {
         const index = this.actionsOnSave.findIndex(ac => ac.type === action.type && ac.requires === action.requires);
         if (action.requires === 'delete') {
             this.actions = this.actions.filter(ac => ac.type !== action['type']);
-            this._showMessage = this.actions.filter(action => action.type === 'delete' || action.type === 'owner' || action.type === 'removeTags'
+            this._showMessage = this.actions.filter(action => action.type === 'delete' || action.type === 'owner' ||  action.type === 'agent' || action.type === 'removeTags'
                 || action.type === 'addTags' || action.type === 'removeCategory' || action.type === 'addCategory' || action.type === 'flavours').length > 0;
             if (action.task?.id && index === -1) {
                 // existing task, need API call to delete

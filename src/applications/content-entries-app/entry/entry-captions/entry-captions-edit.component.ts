@@ -7,7 +7,7 @@ import { KalturaCaptionAsset } from 'kaltura-ngx-client';
 import { KalturaCaptionType } from 'kaltura-ngx-client';
 import { UploadManagement } from '@kaltura-ng/kaltura-common';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
-import { BrowserService } from 'app-shared/kmc-shell/providers';
+import {AppAnalytics, BrowserService, ButtonType} from 'app-shared/kmc-shell/providers';
 import { FileDialogComponent } from '@kaltura-ng/kaltura-ui';
 import { PopupWidgetComponent, PopupWidgetStates } from '@kaltura-ng/kaltura-ui';
 import { NewEntryCaptionFile } from './new-entry-caption-file';
@@ -25,6 +25,7 @@ export class EntryCaptionsEdit implements  OnInit, AfterContentInit, OnDestroy{
 
 	@Input() currentCaption: KalturaCaptionAsset;
 	@Input() parentPopupWidget: PopupWidgetComponent;
+	@Input() ead: boolean;
 
 	@ViewChild('fileDialog', { static: true }) private fileDialog: FileDialogComponent;
 
@@ -42,6 +43,7 @@ export class EntryCaptionsEdit implements  OnInit, AfterContentInit, OnDestroy{
   constructor(private _appLocalization: AppLocalization,
               private _uploadManagement: UploadManagement,
               private _fb: FormBuilder,
+              private _analytics: AppAnalytics,
               private _languageOptions: LanguageOptionsService,
               private _browserService: BrowserService) {
 
@@ -121,6 +123,7 @@ export class EntryCaptionsEdit implements  OnInit, AfterContentInit, OnDestroy{
   }
 
 	public _saveAndClose(): void{
+        this._analytics.trackButtonClickEvent(ButtonType.Add, this.ead ? 'ead_added' : 'caption_added');
 		if (this.captionsEditForm.get("label").dirty) {
 			this.currentCaption.label = this.captionsEditForm.get("label").value;
 			if (this.captionsEditForm.get("label").value === ""){
@@ -137,7 +140,9 @@ export class EntryCaptionsEdit implements  OnInit, AfterContentInit, OnDestroy{
 		}
 		if (this.captionsEditForm.get("format").dirty) {
 			this.currentCaption.format = this.captionsEditForm.get("format").value;
-		}
+		} else if (this.ead) {
+            this.currentCaption.format = KalturaCaptionType.webvtt; // EAD captions are always webvtt
+        }
 		this.currentCaption.accuracy = this.captionsEditForm.get("accuracy").value;
 		this._confirmClose = false;
 

@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { BrowserService } from 'app-shared/kmc-shell/providers';
+import {ActivatedRoute, Router} from '@angular/router';
+import {AppAnalytics, BrowserService} from 'app-shared/kmc-shell/providers';
 import { AreaBlockerMessage, AreaBlockerMessageButton } from '@kaltura-ng/kaltura-ui';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
 import { Observable } from 'rxjs';
@@ -19,7 +19,7 @@ import { DocumentSchedulingWidget } from './document-scheduling/document-schedul
 import { DocumentRelatedWidget } from './document-related/document-related-widget.service';
 import { DocumentUsersWidget } from './document-users/document-users-widget.service';
 import { CustomMenuItem } from 'app-shared/content-shared/entries/entries-list/entries-list.component';
-import { KalturaDocumentEntry, KalturaEntryStatus } from 'kaltura-ngx-client';
+import {KalturaDocumentEntry, KalturaEntryStatus, KalturaSourceType} from 'kaltura-ngx-client';
 import { KMCPermissions, KMCPermissionsService } from 'app-shared/kmc-shared/kmc-permissions';
 import { KalturaLogger } from '@kaltura-ng/kaltura-logger';
 import {AppAuthentication} from 'app-shared/kmc-shell';
@@ -52,19 +52,9 @@ export class DocumentComponent implements OnInit, OnDestroy {
   public _analyticsAllowed = false;
   public _enablePrevButton: boolean;
   public _enableNextButton: boolean;
-    public _items: CustomMenuItem[] = [
-        {
-            label: this._appLocalization.get('applications.content.table.download'),
-            commandName: 'download',
-            styleClass: ''
-        },
-        {
-            label: this._appLocalization.get('applications.content.table.delete'),
-            commandName: 'delete',
-            styleClass: 'kDanger'
-        }
-    ];
+  public _items: CustomMenuItem[] = [];
   public _menuItems: CustomMenuItem[] = [];
+  public _showActions = true;
 
     public get _enableSaveBtn(): boolean {
         return this._documentStore.documentIsDirty; // TODO [kmc] check for room update permissions once added to the backend
@@ -85,15 +75,32 @@ export class DocumentComponent implements OnInit, OnDestroy {
               widget6: DocumentSchedulingWidget,
               widget7: DocumentRelatedWidget,
               widget8: DocumentUsersWidget,
+              private _analytics: AppAnalytics,
               private _contentDocumentView: ContentDocumentViewService,
               private _permissionsService: KMCPermissionsService,
               private _analyticsNewMainViewService: AnalyticsNewMainViewService,
               private _documentRoute: ActivatedRoute,
+              private _router: Router,
               _documentWidgetsManager: DocumentWidgetsManager) {
     _documentWidgetsManager.registerWidgets([widget1, widget2, widget3, widget4, widget5, widget6, widget7, widget8])
   }
 
   ngOnInit() {
+        this._showActions = this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DOWNLOAD) || this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DELETE);
+        if (this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DOWNLOAD)) {
+            this._items.push({
+                label: this._appLocalization.get('applications.content.table.download'),
+                commandName: 'download',
+                styleClass: ''
+            });
+        }
+        if (this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DELETE)) {
+            this._items.push({
+                label: this._appLocalization.get('applications.content.table.delete'),
+                commandName: 'delete',
+                styleClass: 'kDanger'
+            });
+        }
     let errorMessage;
       this._documentStore.notifications$
           .pipe(cancelOnDestroy(this))
@@ -331,6 +338,13 @@ export class DocumentComponent implements OnInit, OnDestroy {
       }
     }
   }
+
+    public _openDocumentAnalytics(): void {
+        if (this._analyticsAllowed) {
+            this._analytics.trackClickEvent('View_analytics');
+            this._router.navigate(['analytics/entry'], { queryParams: { id: this._currentDocumentId } });
+        }
+    }
 
   public canLeave(): Observable<{ allowed: boolean }> {
     return this._documentStore.canLeaveWithoutSaving();

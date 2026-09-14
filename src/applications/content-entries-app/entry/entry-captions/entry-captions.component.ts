@@ -4,9 +4,9 @@ import { Menu } from 'primeng/menu';
 import { ISubscription } from 'rxjs/Subscription';
 
 import { AppLocalization } from '@kaltura-ng/mc-shared';
-import { AppAuthentication } from 'app-shared/kmc-shell';
+import {AppAuthentication, AppBootstrap} from 'app-shared/kmc-shell';
 import { BrowserService } from 'app-shared/kmc-shell/providers';
-import {KalturaCaptionAssetStatus, KalturaCaptionType, KalturaMediaType} from 'kaltura-ngx-client';
+import {KalturaCaptionAssetStatus, KalturaCaptionAssetUsage, KalturaCaptionType, KalturaMediaType} from 'kaltura-ngx-client';
 import { PopupWidgetComponent, PopupWidgetStates } from '@kaltura-ng/kaltura-ui';
 import { EntryCaptionsWidget } from './entry-captions-widget.service';
 import { getKalturaServerUri, serverConfig } from 'config/server';
@@ -32,12 +32,16 @@ export class EntryCaptions implements AfterViewInit, OnInit, OnDestroy {
     public _captionStatusError = KalturaCaptionAssetStatus.error;
     public _requestCaptionsAvailable = false;
     public _isLive = false;
+    public _ead = false;
 
     @ViewChild('actionsmenu', { static: true }) private actionsMenu: Menu;
     @ViewChild('editPopup', { static: true }) public editPopup: PopupWidgetComponent;
 
     private _popupStateChangeSubscribe: ISubscription;
+    private unisphereRuntime: any = null;
+
     constructor(public _widgetService: EntryCaptionsWidget,
+                private _bootstrapService: AppBootstrap,
                 private _appAuthentication: AppAuthentication,
                 private _appLocalization: AppLocalization,
                 private _browserService: BrowserService,
@@ -72,6 +76,15 @@ export class EntryCaptions implements AfterViewInit, OnInit, OnDestroy {
                     (status) => {}
                 );
             });
+
+        this._bootstrapService.unisphereWorkspace$
+            .pipe(cancelOnDestroy(this))
+            .subscribe(unisphereWorkspace => {
+                if (unisphereWorkspace) {
+                    this.unisphereRuntime = unisphereWorkspace.getRuntime('unisphere.widget.content-lab', 'application');
+                }
+            });
+
     }
 
     openActionsMenu(event: any, caption: any): void{
@@ -86,10 +99,17 @@ export class EntryCaptions implements AfterViewInit, OnInit, OnDestroy {
                 this._actions[1].disabled = false;
                 this._actions[1].title = null;
             }
+            // update action label according to caption usage
+            if (caption.usage === KalturaCaptionAssetUsage.extendedAudioDescription) {
+                this._actions[1].label = this._appLocalization.get('applications.content.entryDetails.captions.editorEAD');
+            } else {
+                this._actions[1].label = this._appLocalization.get('applications.content.entryDetails.captions.editor');
+            }
         }
         if (this.actionsMenu){
             // save the selected caption for usage in the actions menu
             this._widgetService.currentCaption = caption;
+            this._ead = caption.usage === KalturaCaptionAssetUsage.extendedAudioDescription;
             this.actions = this.filterActions();
             this.actionsMenu.toggle(event);
         }
@@ -130,8 +150,9 @@ export class EntryCaptions implements AfterViewInit, OnInit, OnDestroy {
         }
     }
 
-    public _addCaption(){
-        this._widgetService._addCaption();
+    public _addCaption(ead: boolean){
+        this._ead = ead;
+        this._widgetService._addCaption(ead);
         setTimeout( () => {this.editPopup.open(); }, 0); // use a timeout to allow data binding of the new caption to update before opening the popup widget
     }
 
@@ -200,6 +221,13 @@ export class EntryCaptions implements AfterViewInit, OnInit, OnDestroy {
     public _requestCaptions(): void {
         const entry = this._widgetService.data;
         this._reachAppViewService.open({ entry, page: ReachPages.entry });
+    }
+
+    public _orderCaptions(): void {
+        const entry = this._widgetService.data;
+        if (this.unisphereRuntime) {
+            this.unisphereRuntime.openApplication({entryId: entry.id, eventSessionContextId: '', type: 'entry', initialView: 'captions'});
+        }
     }
 }
 

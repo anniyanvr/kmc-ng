@@ -21,6 +21,7 @@ import {
 } from './services';
 import {
     KalturaAccessControl,
+    KalturaBaseEntry,
     KalturaEntryStatus,
     KalturaMediaEntry,
     KalturaMediaType,
@@ -88,8 +89,9 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
 
   private _categoriesLocked = false;
 
-  @Input() selectedEntries: KalturaMediaEntry[];
+  @Input() selectedEntries: KalturaBaseEntry[];
   @Input() blockerMessage: AreaBlockerMessage;
+  @Input() isDocuments: boolean;
 
   @Output() onBulkChange = new EventEmitter<{ reload: boolean }>();
   @Output() blockerMessageChange = new EventEmitter<AreaBlockerMessage>();
@@ -143,7 +145,7 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
       name: this._appLocalization.get('applications.content.bulkActions.newPlaylist'),
     }, ContentPlaylistViewSections.Metadata);
     const invalidEntries = this.selectedEntries.filter(entry => {
-        return this._allowedStatusesForPlaylist.indexOf(entry.status.toString()) === -1;
+        return !entry.status || this._allowedStatusesForPlaylist.indexOf(entry.status.toString()) === -1;
     });
 
     if (!invalidEntries.length) {
@@ -154,7 +156,7 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private _handlePlaylistCreationErrors(invalidEntries: KalturaMediaEntry[], creationEvent: CreateNewPlaylistEvent): void {
+  private _handlePlaylistCreationErrors(invalidEntries: KalturaBaseEntry[], creationEvent: CreateNewPlaylistEvent): void {
     const canCreate = this.selectedEntries.length !== invalidEntries.length;
 
     if (canCreate) {
@@ -303,12 +305,14 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
   // bulk delete
   public deleteEntries(): void {
     this._analytics.trackClickEvent('Bulk_delete');
-    const entriesToDelete = this.selectedEntries.map((entry, index) => `${index + 1}: ${entry.name}` ),
+
+    if(this.selectedEntries.length <= 25) {
+      const entriesToDelete = this.selectedEntries.map((entry, index) => `${index + 1}: ${entry.name}` ),
       entries: string = this.selectedEntries.length <= 10 ? entriesToDelete.join(',').replace(/,/gi, '\n') : '',
       message: string = this.selectedEntries.length > 1 ?
         this._appLocalization.get('applications.content.entries.confirmDeleteMultiple', { 0: entries }) :
         this._appLocalization.get('applications.content.entries.confirmDeleteSingle', { 0: entries });
-    this._browserService.confirm(
+        this._browserService.confirm(
       {
         header: this._appLocalization.get('applications.content.bulkActions.deleteEntries'),
         message: message,
@@ -319,13 +323,23 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
         }
       }
     );
+    } else {
+      this._browserService.alert({
+        header: this._appLocalization.get('applications.content.bulkActions.deleteEntries'),
+        message: this._appLocalization.get('applications.content.entries.deleteMultipleOver25Limit', { 0 : this.selectedEntries.length }),
+        accept: () => {
+          return;
+        }
+      })
+    }
   }
 
   // bulk download initial check
   private downloadEntries(): void {
     // check for single image selection - immediate download
-    if (this.selectedEntries.length === 1 && this.selectedEntries[0].mediaType === KalturaMediaType.image) {
-      this._browserService.openLink(this.selectedEntries[0].downloadUrl + '/file_name/name');
+    const entry = this.selectedEntries[0] as KalturaMediaEntry;
+    if (this.selectedEntries.length === 1 && entry.mediaType === KalturaMediaType.image) {
+      this._browserService.openLink(entry.downloadUrl + '/file_name/name');
     } else {
       this.openBulkActionWindow('download', 570, 500);
     }
@@ -376,20 +390,22 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
       });
     } else {
       if (this.selectedEntries.length > 0) {
-          this._contentNewCategoryView.open({entries: this.selectedEntries});
+          this._contentNewCategoryView.open({entries: this.selectedEntries as KalturaMediaEntry[]});
       }
     }
   }
 
   getBulkActionItems(): MenuItem[] {
       const result: MenuItem[] = [
-          {
-              label: this._appLocalization.get('applications.content.bulkActions.download'), command: (event) => {
-              this._bulkMenu.hide();
-              this.downloadEntries();
-          },
-              disabled: !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DOWNLOAD)
-          },
+          ...(this.isDocuments ? [] : [
+              {
+                  label: this._appLocalization.get('applications.content.bulkActions.download'), command: (event) => {
+                      this._bulkMenu.hide();
+                      this.downloadEntries();
+                  },
+                  disabled: !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DOWNLOAD)
+              }
+          ]),
           {
               disabled: !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_ENTRY_USERS),
               label: this._appLocalization.get('applications.content.bulkActions.changeOwner'), command: (event) => {
@@ -450,24 +466,33 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
                   }
               ]
           },
-          {
-              label: this._appLocalization.get('applications.content.bulkActions.addToNewCategoryPlaylist'), items: [
-              {
-                  label: this._appLocalization.get('applications.content.bulkActions.addToNewCategory'),
-                  command: (event) => {
-                      this._addSelectedEntriesToNewCategory();
-                  },
-                  disabled: !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_EDIT_CATEGORIES)
+
+          ...(this.isDocuments ? [{
+              label: this._appLocalization.get('applications.content.bulkActions.addToNewCategory'),
+              command: (event) => {
+                  this._addSelectedEntriesToNewCategory();
               },
+              disabled: !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_EDIT_CATEGORIES)
+          }] : [
               {
-                  label: this._appLocalization.get('applications.content.bulkActions.addToNewPlaylist'),
-                  command: (event) => {
-                      this.performBulkAction('addToNewPlaylist');
-                  },
-                  disabled: !this._permissionsService.hasPermission(KMCPermissions.PLAYLIST_ADD)
-              }],
-              disabled: !this._permissionsService.hasAnyPermissions([KMCPermissions.CONTENT_MANAGE_EDIT_CATEGORIES, KMCPermissions.PLAYLIST_ADD])
-          },
+                  label: this._appLocalization.get('applications.content.bulkActions.addToNewCategoryPlaylist'), items: [
+                      {
+                          label: this._appLocalization.get('applications.content.bulkActions.addToNewCategory'),
+                          command: (event) => {
+                              this._addSelectedEntriesToNewCategory();
+                          },
+                          disabled: !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_EDIT_CATEGORIES)
+                      },
+                      {
+                          label: this._appLocalization.get('applications.content.bulkActions.addToNewPlaylist'),
+                          command: (event) => {
+                              this.performBulkAction('addToNewPlaylist');
+                          },
+                          disabled: !this._permissionsService.hasPermission(KMCPermissions.PLAYLIST_ADD)
+                      }],
+                  disabled: !this._permissionsService.hasAnyPermissions([KMCPermissions.CONTENT_MANAGE_EDIT_CATEGORIES, KMCPermissions.PLAYLIST_ADD])
+              }
+          ]),
           {
               label: this._appLocalization.get('applications.content.bulkActions.addRemoveCategories'), items: [
               {
@@ -525,7 +550,7 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
       this._permissionsService.filterList(
           <{ id: string }[]>result,
           {
-              'captionRequest': this._reachAppViewService.isAvailable({ page: ReachPages.entries, entries: this.selectedEntries })
+              'captionRequest': this._reachAppViewService.isAvailable({ page: ReachPages.entries, entries: this.selectedEntries as KalturaMediaEntry[] })
           }
       );
 
@@ -534,19 +559,20 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
 
   public _captionRequest(): void {
       this._bulkMenu.hide();
-      if (!this._reachAppViewService.isAvailable({ page: ReachPages.entries, entries: this.selectedEntries })) {
+      const mediaEntries = this.selectedEntries as KalturaMediaEntry[];
+      if (!this._reachAppViewService.isAvailable({ page: ReachPages.entries, entries: mediaEntries })) {
           return;
       }
 
-      const invalidEntries = this.selectedEntries
+      const invalidEntries = mediaEntries
           .filter(entry => !this._reachAppViewService.isRelevantEntry(entry));
 
       if (!invalidEntries.length) {
-          this._reachAppViewService.open({ entries: this.selectedEntries, page: ReachPages.entries });
+          this._reachAppViewService.open({ entries: mediaEntries, page: ReachPages.entries });
           return;
       }
 
-      if (invalidEntries.length === this.selectedEntries.length) {
+      if (invalidEntries.length === mediaEntries.length) {
           this.blockerMessageChange.emit(new AreaBlockerMessage({
               title: this._appLocalization.get('app.common.attention'),
               message: this._appLocalization.get('applications.content.bulkActions.captionRequestAllInvalid'),
@@ -560,7 +586,7 @@ export class BulkActionsComponent implements OnInit, OnDestroy {
           return;
       }
 
-      const validEntries = this.selectedEntries
+      const validEntries = mediaEntries
           .filter(entry => this._reachAppViewService.isRelevantEntry(entry));
 
       this.blockerMessageChange.emit(new AreaBlockerMessage({

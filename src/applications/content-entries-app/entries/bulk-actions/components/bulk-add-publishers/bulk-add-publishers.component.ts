@@ -2,17 +2,7 @@ import {AfterViewInit, Component, EventEmitter, Input, OnDestroy, OnInit, Output
 import {ISubscription} from 'rxjs/Subscription';
 import {Subject} from 'rxjs';
 
-import {
-    ESearchSearchUserAction,
-    KalturaClient,
-    KalturaESearchItemType,
-    KalturaESearchOperatorType, KalturaESearchUserFieldName,
-    KalturaESearchUserItem,
-    KalturaESearchUserOperator,
-    KalturaESearchUserParams,
-    KalturaESearchUserResult
-} from 'kaltura-ngx-client';
-import {KalturaFilterPager} from 'kaltura-ngx-client';
+import {KalturaClient, KalturaESearchUserResult} from 'kaltura-ngx-client';
 import {SuggestionsProviderData} from '@kaltura-ng/kaltura-primeng-ui';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
 import {BrowserService} from 'app-shared/kmc-shell';
@@ -20,6 +10,7 @@ import {AreaBlockerMessage} from '@kaltura-ng/kaltura-ui';
 import {PopupWidgetComponent, PopupWidgetStates} from '@kaltura-ng/kaltura-ui';
 import {KalturaUser} from 'kaltura-ngx-client';
 import { cancelOnDestroy, tag } from '@kaltura-ng/kaltura-common';
+import {buildUserSearchQuery, isHashed} from 'app-shared/kmc-shared';
 
 @Component({
   selector: 'kBulkAddPublishers',
@@ -83,6 +74,10 @@ export class BulkAddPublishersComponent implements OnInit, OnDestroy, AfterViewI
     this._parentPopupStateChangeSubscribe.unsubscribe();
   }
 
+    public getUnhashedField(value: KalturaUser): string  {
+        return isHashed(value['id']) ? value['email'] || value['fullName'] || value['screenName'] : value['id'];
+    };
+
   _searchUsers(event): void {
     this._usersProvider.next({suggestions: [], isLoading: true});
 
@@ -92,39 +87,7 @@ export class BulkAddPublishersComponent implements OnInit, OnDestroy, AfterViewI
       this._searchPublishersSubscription = null;
     }
 
-    this._kalturaServerClient.request(new ESearchSearchUserAction({
-        searchParams: new KalturaESearchUserParams({
-            searchOperator: new KalturaESearchUserOperator({
-                operator: KalturaESearchOperatorType.orOp,
-                searchItems: [
-                    new KalturaESearchUserItem({
-                        itemType: KalturaESearchItemType.startsWith,
-                        fieldName: KalturaESearchUserFieldName.screenName,
-                        searchTerm: event.query
-                    }),
-                    new KalturaESearchUserItem({
-                        itemType: KalturaESearchItemType.startsWith,
-                        fieldName: KalturaESearchUserFieldName.firstName,
-                        searchTerm: event.query.split(" ")[0]
-                    }),
-                    new KalturaESearchUserItem({
-                        itemType: KalturaESearchItemType.partial,
-                        fieldName: KalturaESearchUserFieldName.lastName,
-                        searchTerm: event.query
-                    }),
-                    new KalturaESearchUserItem({
-                        itemType: KalturaESearchItemType.startsWith,
-                        fieldName: KalturaESearchUserFieldName.userId,
-                        searchTerm: event.query
-                    })
-                ]
-            })
-        }),
-        pager: new KalturaFilterPager({
-            pageIndex : 0,
-            pageSize : 30
-        })
-    }))
+    this._kalturaServerClient.request(buildUserSearchQuery(event.query))
       .pipe(cancelOnDestroy(this))
       .subscribe(
         result => {
@@ -134,10 +97,10 @@ export class BulkAddPublishersComponent implements OnInit, OnDestroy, AfterViewI
             result.objects.forEach((res: KalturaESearchUserResult) => users.push(res.object))
           }
           users.forEach(suggestedUser => {
-              suggestedUser['__tooltip'] = suggestedUser.id;
+              suggestedUser['__tooltip'] = this.getUnhashedField(suggestedUser);
             const isSelectable = !(this.users || []).find(user => user.id === suggestedUser.id);
             suggestions.push({
-              name: `${suggestedUser.screenName} (${suggestedUser.id})`,
+              name: `${this.getUnhashedField(suggestedUser)} (${suggestedUser.id})`,
               item: suggestedUser,
               isSelectable: isSelectable
             });

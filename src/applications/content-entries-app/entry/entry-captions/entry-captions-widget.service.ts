@@ -33,11 +33,12 @@ import { NewEntryCaptionFile } from './new-entry-caption-file';
 import { EntryWidget } from '../entry-widget';
 import { FriendlyHashId } from '@kaltura-ng/kaltura-common';
 import { ContentEntryViewSections } from 'app-shared/kmc-shared/kmc-views/details-views/content-entry-view.service';
-import {KalturaLogger} from '@kaltura-ng/kaltura-logger';
+import { KalturaLogger } from '@kaltura-ng/kaltura-logger';
 import { cancelOnDestroy, tag } from '@kaltura-ng/kaltura-common';
 import { filter, map, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { of } from 'rxjs';
+import { KalturaStreamContainer, KalturaCaptionAssetUsage } from 'kaltura-ngx-client';
 
 export interface CaptionRow {
     uploading: boolean;
@@ -53,8 +54,22 @@ export interface CaptionRow {
     language: KalturaLanguage;
     label: string;
     fileExt: string;
+    usage: KalturaCaptionAssetUsage;
     status?: KalturaCaptionAssetStatus;
     displayOnPlayer?: boolean;
+}
+
+export interface LiveCaptions {
+    adminTag: string;
+    streams: KalturaStreamContainer[];
+    streamsModified: boolean;
+}
+
+export interface StreamContainer {
+    id: string;
+    protocol: 'CEA-608' | 'CEA-708';
+    language: string;
+    label: string;
 }
 
 @Injectable()
@@ -70,6 +85,13 @@ export class EntryCaptionsWidget extends EntryWidget  implements OnDestroy {
 
     public _captions$ = this._captions.asObservable();
     public currentCaption: CaptionRow;
+
+    public liveCaptions: LiveCaptions = {
+        adminTag: '',
+        streams: [],
+        streamsModified: false
+    };
+    public _protocolError = '';
 
     private _entryId: string = '';
 
@@ -271,7 +293,7 @@ export class EntryCaptionsWidget extends EntryWidget  implements OnDestroy {
       return status;
     }
 
-  public _addCaption(): any {
+  public _addCaption(ead: boolean): any {
 
     const newCaption: CaptionRow = {
       uploading: false,
@@ -286,7 +308,8 @@ export class EntryCaptionsWidget extends EntryWidget  implements OnDestroy {
       isDefault: 0,
       fileExt: '',
       status: null,
-      displayOnPlayer: true,
+      usage: ead ? KalturaCaptionAssetUsage.extendedAudioDescription : KalturaCaptionAssetUsage.caption,
+      displayOnPlayer: !ead,
     };
 
     // create a copy of the captions array without a reference to the original array
@@ -359,6 +382,7 @@ export class EntryCaptionsWidget extends EntryWidget  implements OnDestroy {
               label: record.item.label,
               displayOnPlayer: record.item.displayOnPlayer,
               accuracy: record.item.accuracy,
+              usage: record.item.usage,
               isDefault: 0
             });
             const addCaptionRequest = new CaptionAssetAddAction({ entryId: this.data.id, captionAsset: captionAsset });
@@ -426,6 +450,24 @@ export class EntryCaptionsWidget extends EntryWidget  implements OnDestroy {
         }
       });
     }
+
+    // handle live captions save
+      if (this.liveCaptions.adminTag.length) {
+          const adminTags = this.data?.adminTags.split(',') || [];
+          const clearedAdminTags = adminTags.filter(tag => tag !== 'prioritize_ingested_captions' && tag !== 'extract_closed_caption_feature').join(',');
+          data.adminTags = clearedAdminTags.length > 0 ? clearedAdminTags + `,${this.liveCaptions.adminTag}` : this.liveCaptions.adminTag;
+      } else {
+          // remove previous admin tags
+          if (this.data.adminTags?.length) {
+              const adminTags = this.data?.adminTags.split(',') || [];
+              data.adminTags = adminTags.filter(tag => tag !== 'prioritize_ingested_captions' && tag !== 'extract_closed_caption_feature').join(',');
+          }
+      }
+    if (this.liveCaptions.streamsModified) {
+        const nonClosedCaptionsStreams = (data.streams || []).filter(stream => stream.type !== 'closedCaptions');
+        data.streams = [...nonClosedCaptionsStreams, ...this.liveCaptions.streams];
+    }
+    // else: omit streams from payload — API partial-update semantics preserve existing stream containers (SUP-53217)
   }
 
     getCaptionPreviewUrl(): Observable<{ url: string }> {
@@ -434,6 +476,22 @@ export class EntryCaptionsWidget extends EntryWidget  implements OnDestroy {
         } else {
             return throwError(new Error('cannot generate caption preview url. missing caption id'));
         }
+    }
+
+    public validate(): void {
+        super.updateState({
+            isValid: !this._protocolError.length,
+            isDirty: true
+        });
+    }
+
+    protected onValidate(wasActivated: boolean) : Observable<{ isValid : boolean}>
+    {
+        return Observable.create(observer =>
+        {
+            observer.next({ isValid: !this._protocolError.length });
+            observer.complete()
+        });
     }
 
     public setDirty() {

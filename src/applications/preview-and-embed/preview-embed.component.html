@@ -1,4 +1,4 @@
-<k-area-blocker [showLoader]="_isBusy" [message]="_blockerMessage">
+<k-area-blocker [showLoader]="_isBusy || _widgetId === null" [message]="_blockerMessage">
     <div #preview class="kPreviewAndEmbed">
         <form [formGroup]="_previewForm" novalidate>
 
@@ -13,14 +13,16 @@
                         <ng-template let-item pTemplate="selectedItem">
                             <div class="playerItem selectedPlayer">
                                 <div *ngIf="item.value.uiConf.objType===22" class="playerIcon audio"></div>
-                                <div *ngIf="item.value.uiConf.objType!==22" [class]="'playerIcon v'+item.value.version"></div>
+                                <div *ngIf="item.value.uiConf.objType===23" class="playerIcon reels"></div>
+                                <div *ngIf="item.value.uiConf.objType!==22 && item.value.uiConf.objType!==23" [class]="'playerIcon v'+item.value.version"></div>
                                 <span>{{item.label}}</span>
                             </div>
                         </ng-template>
                         <ng-template let-item pTemplate="item">
                             <div class="playerItem">
                                 <div *ngIf="item.value.uiConf.objType===22" class="playerIcon audio"></div>
-                                <div *ngIf="item.value.uiConf.objType!==22" [class]="'playerIcon v'+item.value.version"></div>
+                                <div *ngIf="item.value.uiConf.objType===23" class="playerIcon reels"></div>
+                                <div *ngIf="item.value.uiConf.objType!==22 && item.value.uiConf.objType!==23" [class]="'playerIcon v'+item.value.version"></div>
                                 <span>{{item.label}}</span>
                                 <i class="check kIconcheck_small"></i>
                             </div>
@@ -32,7 +34,7 @@
             </div>
 
             <div class="kPreview">
-                <div class="kPreviewContainer" [class.audioPlayer]="this._isAudioPlayer">
+                <div class="kPreviewContainer" [class.audioPlayer]="_isAudioPlayer" [class.responsive]="_previewForm.controls['responsive'].value === true">
                     <iframe #previewIframe *ngIf="_showPlayer" frameborder="0" marginheight="0" marginwidth="0" allowFullScreen webkitallowfullscreen mozallowfullscreen></iframe>
                 </div>
                 <div class="kPreviewParams" [style.maxWidth]="_showEmbedParams ? '450px' : '0px'">
@@ -47,11 +49,11 @@
                               <button pButton type="button" class="kButtonBranded kCopyCode" (click)="copyEmbedCode(code)" label="{{'applications.embed.copy' | translate}}"></button>
                           </div>
                         </ng-container>
-                        <div class="kSection kAlignTop kRow" *ngIf="_showShortLink">
+                        <div class="kSection kAlignTop kRow" *ngIf="_showShortLink && _previewForm.controls['secured'].value">
                             <span class="kCol">{{'applications.embed.view' | translate}}</span>
                             <a href="{{_shortLink}}" target="_blank">{{_shortLink}}</a>
                         </div>
-                        <div class="kSection kRow kAlignTop" *ngIf="_showShortLink">
+                        <div class="kSection kRow kAlignTop" *ngIf="_showShortLink && _previewForm.controls['secured'].value">
                             <span class="kCol">{{'applications.embed.qr' | translate}}</span>
                             <qrcode *ngIf="_shortLink" [qrdata]="_shortLink" [margin]="0" [width]="80" [errorCorrectionLevel]="'M'"></qrcode>
                         </div>
@@ -61,7 +63,7 @@
                             <i class="kAdvancedArrow kIcondropdown_arrow_right" [class.kArrowDown]="_showAdvanced"></i>
                         </div>
 
-                        <div class="kAdvanced" [style.maxHeight]="_showAdvanced ? '250px' : '0px'">
+                        <div class="kAdvanced" [style.maxHeight]="_showAdvanced ? '300px' : '0px'">
                             <div class="kSection kRow">
                                 <div class="kCol">
                                     <span>{{'applications.embed.embedType' | translate}}</span>
@@ -77,6 +79,14 @@
                                 <span class="kCol">{{'applications.embed.https' | translate}}</span>
                                 <p-inputSwitch formControlName="secured"></p-inputSwitch>
                             </div>
+                            <div class="kSection kRow kAlignTop" *ngIf="_showResponsive">
+                                <span class="kCol">{{'applications.embed.responsive' | translate}}</span>
+                                <p-inputSwitch formControlName="responsive"></p-inputSwitch>
+                            </div>
+<!--                            <div class="kSection kRow kAlignTop" *ngIf="_showDee">-->
+<!--                                <span class="kCol">{{'applications.embed.dee' | translate}}</span>-->
+<!--                                <p-inputSwitch formControlName="dee"></p-inputSwitch>-->
+<!--                            </div>-->
                         </div>
                     </div>
 

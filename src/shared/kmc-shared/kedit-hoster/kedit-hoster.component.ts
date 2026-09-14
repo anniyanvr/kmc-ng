@@ -18,6 +18,7 @@ import { BrowserService } from 'app-shared/kmc-shell/providers/browser.service';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
 import { KalturaLiveEntry } from 'kaltura-ngx-client';
 import { KalturaMediaType } from 'kaltura-ngx-client';
+import { UpdateQuizzesEvent } from 'app-shared/kmc-shared/events/update-quizzes-event';
 
 
 @Component({
@@ -32,11 +33,11 @@ export class KeditHosterComponent implements OnInit, OnDestroy, OnChanges {
 
   @Input() entry: KalturaMediaEntry | KalturaLiveEntry = null;
   @Input() tab: 'quiz' | 'editor' | 'advertisements' | 'hotspots' = null;
-    @Input() entryHasSource = false;
+  @Input() entryHasSource = false;
 
   @Output() enteredDraftMode = new EventEmitter<void>();
   @Output() exitDraftMode = new EventEmitter<void>();
-    @Output() closeEditor = new EventEmitter<void>();
+  @Output() closeEditor = new EventEmitter<void>();
 
 
   public keditUrl: string;
@@ -110,6 +111,11 @@ export class KeditHosterComponent implements OnInit, OnDestroy, OnChanges {
               }, e.origin);
           }
 
+
+          /* received when a quiz was created.*/
+          if (postMessageData.messageType === 'kea-quiz-created') {
+              this._appEvents.publish(new UpdateQuizzesEvent());
+          }
 
           /*
 		  * Fired when modifying advertisements (save not performed yet).
@@ -186,6 +192,7 @@ export class KeditHosterComponent implements OnInit, OnDestroy, OnChanges {
               entry: this.entry,
               hasSource: this.entryHasSource
           });
+          console.log("quizAvailable: "+quizAvailable)
           const hotspotsAvailable = this._hotspotsAppViewService.isAvailable({
               entry: this.entry,
               hasSource: this.entryHasSource
@@ -228,7 +235,7 @@ export class KeditHosterComponent implements OnInit, OnDestroy, OnChanges {
               this._logger.debug('quiz view is available, add configuration for tabs: quiz');
               tabs['quiz'] = {
                   name: 'quiz',
-                  permissions: ['quiz'],
+                  permissions: ['quiz','questions-v2','questions-v3','enable-retake','preventSeek'],
                   userPermissions: ['quiz']
               };
           }
@@ -275,7 +282,6 @@ export class KeditHosterComponent implements OnInit, OnDestroy, OnChanges {
                   keditUrl = null;
                   break;
           }
-
 
           if (keditUrl) {
               this._logger.debug('show kedit application', {keditUrl: keditUrl, tab: this.tab});

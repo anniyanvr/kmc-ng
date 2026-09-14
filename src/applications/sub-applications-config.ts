@@ -10,6 +10,8 @@ export interface SubApplicationsConfig {
     previewAndEmbedApp: {
         includeKalturaLinks: boolean,
         secureEmbed: boolean,
+        responsive: boolean,
+        dee: boolean,
         includeSeoMetadata: boolean,
         embedType: 'dynamic' | 'iframe' | 'auto' | 'thumb'
     };
@@ -34,11 +36,13 @@ export const subApplicationsConfig: SubApplicationsConfig = {
         'bulkActionsLimit': 50
     },
     'contentPlaylistsApp': {
-        'ruleBasedTotalResults': 200
+        'ruleBasedTotalResults': 150
     },
     'previewAndEmbedApp': {
         'includeKalturaLinks': false,
         'secureEmbed': true,
+        'responsive': false,
+        'dee': false,
         'includeSeoMetadata': false,
         'embedType': 'dynamic'
     },

@@ -142,6 +142,7 @@ export class DocumentsStore extends FiltersStoreBase<DocumentsFilters> implement
             const data: DocumentsFilters = this._getFiltersAsReadonly();
 
             filter.statusIn = '-1,-2,0,1,2,7,4';
+            filter.moderationStatusIn = '1,5,2,6';
 
             // filter 'createdAt'
             if (data.createdAt) {
@@ -157,7 +158,7 @@ export class DocumentsStore extends FiltersStoreBase<DocumentsFilters> implement
             // update desired fields of entries
             responseProfile = new KalturaDetachedResponseProfile({
                 type: KalturaResponseProfileType.includeFields,
-                fields: 'id,name,createdAt,status,tags,thumbnailUrl,moderationStatus,downloadUrl'
+                fields: 'id,name,thumbnailUrl,mediaType,plays,createdAt,duration,status,startDate,endDate,moderationStatus,moderationCount,tags,adminTags,categoriesIds,downloadUrl,sourceType,entitledUsersPublish,entitledUsersView,entitledUsersEdit,externalSourceType,capabilities,redirectEntryId,recordedEntryId'
             });
 
             // update the sort by args

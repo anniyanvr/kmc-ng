@@ -4,21 +4,13 @@ import { FormBuilder, FormGroup } from '@angular/forms';
 import { ISubscription } from 'rxjs/Subscription';
 import { Observable } from 'rxjs';
 import {
-    ESearchSearchUserAction,
     KalturaClient,
-    KalturaESearchUserItem,
-    KalturaESearchUserOperator,
-    KalturaFilterPager,
     KalturaMediaEntry,
     KalturaMultiRequest,
     KalturaMultiResponse,
     KalturaResponse,
     KalturaUser,
-    KalturaESearchOperatorType,
     UserGetAction,
-    KalturaESearchUserFieldName,
-    KalturaESearchUserParams,
-    KalturaESearchItemType,
     KalturaESearchUserResponse,
     KalturaESearchUserResult
 } from 'kaltura-ngx-client';
@@ -32,12 +24,13 @@ import { cancelOnDestroy } from '@kaltura-ng/kaltura-common';
 import { merge, forkJoin } from 'rxjs';
 import { observeOn, map, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { buildUserSearchQuery } from 'app-shared/kmc-shared';
 
 @Injectable()
 export class EntryUsersWidget extends EntryWidget implements OnDestroy
 {
 
-    public _creator: string = "";
+    public _creator: KalturaUser = null;
 	public _owner: KalturaUser = null;
 
 	public usersForm : FormGroup;
@@ -118,7 +111,7 @@ export class EntryUsersWidget extends EntryWidget implements OnDestroy
      */
     protected onReset()
     {
-	    this._creator = "";
+	    this._creator = null;
 	    this._owner = null;
 	    this.usersForm.reset({
 		    owners: [],
@@ -138,7 +131,7 @@ export class EntryUsersWidget extends EntryWidget implements OnDestroy
       }
 
         if (!this.data.creatorId && !this.data.userId) {
-            this._creator = '';
+            this._creator = new KalturaUser({ screenName: '' });
             this._owner = new KalturaUser({ screenName: '' });
         } else {
             const getUserActions = [];
@@ -159,16 +152,13 @@ export class EntryUsersWidget extends EntryWidget implements OnDestroy
                 .pipe(cancelOnDestroy(this, this.widgetReset$))
                 .pipe(map((responses: KalturaMultiResponse) => {
                     if (responses.hasErrors()) {
-                        this._creator = this.data.creatorId;
+                        this._creator = new KalturaUser({ screenName: this.data.creatorId });
                         this._owner = new KalturaUser({ screenName: this.data.userId });
                     } else {
                         const creatorResponse = responses.find((item: KalturaResponse<KalturaUser>) => item.result.id === this.data.creatorId);
                         const ownerResponse = responses.find((item: KalturaResponse<KalturaUser>) => item.result.id === this.data.userId);
 
-                        this._creator = creatorResponse
-                            ? (creatorResponse.result.screenName ? creatorResponse.result.screenName : creatorResponse.result.id)
-                            : this.data.creatorId;
-
+                        this._creator = creatorResponse ? creatorResponse.result : new KalturaUser({ screenName: this.data.creatorId });
                         this._owner = ownerResponse ? ownerResponse.result : new KalturaUser({ screenName: this.data.userId });
                     }
 
@@ -273,41 +263,7 @@ export class EntryUsersWidget extends EntryWidget implements OnDestroy
 	{
 		return Observable.create(
 			observer => {
-				const requestSubscription: ISubscription = this._kalturaServerClient.request(
-                    new ESearchSearchUserAction({
-                        searchParams: new KalturaESearchUserParams({
-                            searchOperator: new KalturaESearchUserOperator({
-                                operator: KalturaESearchOperatorType.orOp,
-                                searchItems: [
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.startsWith,
-                                        fieldName: KalturaESearchUserFieldName.screenName,
-                                        searchTerm: text
-                                    }),
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.startsWith,
-                                        fieldName: KalturaESearchUserFieldName.firstName,
-                                        searchTerm: text.split(" ")[0]
-                                    }),
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.partial,
-                                        fieldName: KalturaESearchUserFieldName.lastName,
-                                        searchTerm: text
-                                    }),
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.startsWith,
-                                        fieldName: KalturaESearchUserFieldName.userId,
-                                        searchTerm: text
-                                    })
-                                ]
-                            })
-                        }),
-                        pager: new KalturaFilterPager({
-                            pageIndex : 0,
-                            pageSize : 30
-                        })
-                    })
-				)
+				const requestSubscription: ISubscription = this._kalturaServerClient.request(buildUserSearchQuery(text))
 				.pipe(cancelOnDestroy(this, this.widgetReset$))
 				.subscribe(
                     (result: KalturaESearchUserResponse) =>

@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
 import {AppAnalytics, ButtonType} from 'app-shared/kmc-shell';
+import {KalturaMediaEntryFilter} from 'kaltura-ngx-client';
 
 @Component({
     selector: 'kCriteriaPlayed',
@@ -38,24 +39,27 @@ export class CriteriaPlayedComponent implements OnInit{
 
     public _timeIntervalOptions: { value: string, label: string }[] = [
         {value: 'lastPlayedAtGreaterThanOrEqual', label: this._appLocalization.get('applications.settings.mr.criteria.less')},
-        {value: 'lastPlayedAtLessThanOrEqual', label: this._appLocalization.get('applications.settings.mr.criteria.more')}
+        {value: 'lastPlayedAtLessThanOrEqualOrNull', label: this._appLocalization.get('applications.settings.mr.criteria.more')}
     ];
 
     public playedTimeUnit = 'day';
     public playedTime = 0;
     public playedTimeInterval = 'lastPlayedAtGreaterThanOrEqual';
 
-    @Input() set filter(value: any) {
-        ['lastPlayedAtLessThanOrEqual', 'lastPlayedAtGreaterThanOrEqual'].forEach(key => {
+    private _filter: KalturaMediaEntryFilter;
+
+    @Input() set filter(value: KalturaMediaEntryFilter) {
+        ['lastPlayedAtLessThanOrEqualOrNull', 'lastPlayedAtGreaterThanOrEqual'].forEach(key => {
             if (value && value[key]) {
                 this.playedTimeInterval = key;
                 this.playedTime = Math.abs(value[key].numberOfUnits) || 0;
                 this.playedTimeUnit = value[key].dateUnit || 'day';
             }
         });
+        this._filter = value;
     }
     @Output() onDelete = new EventEmitter<string>();
-    @Output() onFilterChange = new EventEmitter<{field: string, value: any}>();
+    @Output() onFilterChange = new EventEmitter<KalturaMediaEntryFilter>();
 
     constructor(private _analytics: AppAnalytics, private _appLocalization: AppLocalization) {
     }
@@ -64,16 +68,20 @@ export class CriteriaPlayedComponent implements OnInit{
     }
 
     public onCriteriaChange(): void {
-        const value = {};
-        value[this.playedTimeInterval] = {
+        delete this._filter['lastPlayedAtLessThanOrEqualOrNull'];
+        delete this._filter['lastPlayedAtGreaterThanOrEqual'];
+        this._filter[this.playedTimeInterval] = {
             numberOfUnits: this.playedTime * -1,
             dateUnit: this.playedTimeUnit
         };
         this._analytics.trackButtonClickEvent(ButtonType.Choose, 'AM_criteria_last_played_type', this.playedTimeInterval === 'lastPlayedAtGreaterThanOrEqual' ? 'less than' : 'more than' , 'Automation_manager');
-        this.onFilterChange.emit({field: 'played', value});
+        this.onFilterChange.emit(this._filter);
     }
 
     public delete(): void {
+        delete this._filter['lastPlayedAtLessThanOrEqualOrNull'];
+        delete this._filter['lastPlayedAtGreaterThanOrEqual'];
+        this.onFilterChange.emit(this._filter);
         this.onDelete.emit('played');
     }
 }

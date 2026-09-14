@@ -2,7 +2,13 @@ import {Injectable, OnDestroy} from '@angular/core';
 import {BehaviorSubject} from 'rxjs';
 import { Observable } from 'rxjs';
 
-import {KalturaClient} from 'kaltura-ngx-client';
+import {
+    KalturaClient,
+    KalturaMediaType, KalturaNullableBoolean,
+    KalturaQuizAdvancedFilter,
+    KalturaSearchOperator,
+    KalturaSearchOperatorType
+} from 'kaltura-ngx-client';
 import {KalturaMediaEntryFilter} from 'kaltura-ngx-client';
 import {KalturaFilterPager} from 'kaltura-ngx-client';
 import {KalturaDetachedResponseProfile} from 'kaltura-ngx-client';
@@ -97,8 +103,15 @@ export class EntryClipsWidget extends EntryWidget implements OnDestroy {
     }
   }
 
-  public navigateToEntry(entry: KalturaMediaEntry): void {
+  public navigateToEntry(entry: KalturaMediaEntry | string): void {
     this._store.openEntry(entry);
+  }
+
+  public isLiveEntry(): boolean {
+    return this.data.mediaType === KalturaMediaType.liveStreamFlash ||
+        this.data.mediaType === KalturaMediaType.liveStreamWindowsMedia ||
+        this.data.mediaType === KalturaMediaType.liveStreamRealMedia ||
+        this.data.mediaType === KalturaMediaType.liveStreamQuicktime;
   }
 
   private _updateClipProperties(clips: any[]): any[] {
@@ -134,10 +147,22 @@ export class EntryClipsWidget extends EntryWidget implements OnDestroy {
       super._showLoader();
 
       // build the request
+      let rootEntryIdIn = entry.id;
+      // for live entries, list clips created from the recording as well
+      if (this.isLiveEntry() && entry.redirectEntryId?.length) {
+          rootEntryIdIn += `,${entry.redirectEntryId}`;
+      }
       let requestSubscription = this._kalturaServerClient.request(new BaseEntryListAction({
         filter: new KalturaMediaEntryFilter(
           {
-            rootEntryIdEqual: entry.id,
+            rootEntryIdIn,
+            advancedSearch: new KalturaSearchOperator({
+                type: KalturaSearchOperatorType.searchAnd,
+                items: [new KalturaSearchOperator({
+                    type: KalturaSearchOperatorType.searchOr,
+                    items: [new KalturaQuizAdvancedFilter({ isQuiz: KalturaNullableBoolean.falseValue })]
+                })]
+            }),
             orderBy: `${this.sortOrder === 1 ? '+' : '-'}${this.sortBy}`
           }
         ),

@@ -19,7 +19,6 @@ import {EntryComponent} from './entry.component';
 import {EntryPreview} from './entry-preview/entry-preview.component';
 import {EntryDetails} from './entry-details/entry-details.component';
 import {JumpToSection} from './entry-metadata/jump-to-section.component';
-import {CategoriesSelector} from './entry-metadata/category-selector/categories-selector.component';
 import {TagsPipe} from './entry-flavours/pipes/tags.pipe';
 
 import {EntryDistributionComponent } from './entry-distribution/entry-distribution.component';
@@ -43,13 +42,14 @@ import {EntryEditorComponent} from './entry-editor/entry-editor.component';
 import { FlavorLinkComponent } from './entry-flavours/flavor-link/flavor-link.component';
 import { MatchDropFolderComponent } from './entry-flavours/flavor-replace-video/match-drop-folder/match-drop-folder.component';
 import { DownloadEntryComponent } from './components/download-entry/download-entry.component';
-
+import {EntryLiveCaptions} from './entry-captions/entry-live-captions.component';
+import {EntryQuizzes} from './entry-quizzes/entry-quizzes.component';
 
 export const EntryComponentsList = [
-    CategoriesSelector,
     DRMDetails,
     EntryAccessControl,
     EntryCaptions,
+    EntryLiveCaptions,
     EntryCaptionsEdit,
     EntryClips,
     EntryAdvertisementsComponent,
@@ -59,6 +59,7 @@ export const EntryComponentsList = [
     EntryMetadata,
     EntryPreview,
     EntryDetails,
+    EntryQuizzes,
     EntryRelated,
     EntryRelatedEdit,
     EntryScheduling,

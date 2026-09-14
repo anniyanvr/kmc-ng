@@ -5,19 +5,11 @@ import {AbstractControl, FormBuilder, FormGroup, Validators} from '@angular/form
 import {
     KalturaClient,
     KalturaFilterPager,
-    KalturaNullableBoolean,
     KalturaUser,
     KalturaUserFilter,
     KalturaUserType,
     UserListAction,
-    KalturaESearchUserResult,
-    ESearchSearchUserAction,
-    KalturaESearchUserParams,
-    KalturaESearchUserOperator,
-    KalturaESearchOperatorType,
-    KalturaESearchUserItem,
-    KalturaESearchItemType,
-    KalturaESearchUserFieldName
+    KalturaESearchUserResult
 } from 'kaltura-ngx-client';
 import { KalturaLogger } from '@kaltura-ng/kaltura-logger';
 import { cancelOnDestroy } from "@kaltura-ng/kaltura-common";
@@ -27,7 +19,8 @@ import { ISubscription } from "rxjs/Subscription";
 import { Observable } from "rxjs";
 import { CategoriesSearchService } from "app-shared/content-shared/categories/categories-search.service";
 import {AppAnalytics, BrowserService, ButtonType, PageType} from 'app-shared/kmc-shell';
-import { TeamsIntegration } from '../teams.service';
+import {TeamsIntegration, TeamsIntegrationUserIdSearchMethod} from '../teams.service';
+import {buildUserSearchQuery} from 'app-shared/kmc-shared';
 
 @Component({
     selector: 'kTeamsEditProfile',
@@ -146,11 +139,13 @@ export class EditTeamsProfileComponent implements OnDestroy {
             uploadIn: optInGroupNames,
             uploadOut: optOutGroupNames,
             transcripts: this._profile.settings?.uploadTranscripts ? true : false,
+            // adhoc: this._profile.settings?.uploadAdHocRecordings ? true : false,
             coOrganizerRoles: this.getRole(this._profile.settings?.coOrganizerRoles || []),
             presentersRoles: this.getRole(this._profile.settings?.presentersRoles || []),
             attendeesRoles: this.getRole(this._profile.settings?.attendeesRoles || []),
             userId: this._profile.settings?.userIdSource === 'upn' ? true : false,
             postfix: this._profile.settings?.userIdSuffixMethod === 'append' ? 2 : this._profile.settings?.userIdSuffixMethod === 'remove' ? 1 : 0,
+            userSearchMethod: this._profile.settings?.userSearchMethod || TeamsIntegrationUserIdSearchMethod.Id,
             userPostfix: this._profile.settings?.userIdSuffix || '',
             createUser: this._profile.settings?.defaultUserId ? false : true,
             defaultUserId: this._profile.settings?.defaultUserId ? [{id: this._profile.settings?.defaultUserId}] : [],
@@ -174,11 +169,13 @@ export class EditTeamsProfileComponent implements OnDestroy {
             uploadIn: [[]],
             uploadOut: [[]],
             transcripts: true,
+            // adhoc: false,
             coOrganizerRoles: null,
             presentersRoles: null,
             attendeesRoles: null,
             userId: true,
             postfix: 0,
+            userSearchMethod: TeamsIntegrationUserIdSearchMethod.Id,
             userPostfix: [''],
             createUser: true,
             defaultUserId: [''],
@@ -228,6 +225,11 @@ export class EditTeamsProfileComponent implements OnDestroy {
         this._analytics.trackButtonClickEvent(ButtonType.Toggle, 'Teams_upload_transcripts', key);
     }
 
+    public sendDdhocAnalytics(): void {
+        const key = this._profileForm.controls['adhoc'].value ? 'enable' : 'disable';
+        this._analytics.trackButtonClickEvent(ButtonType.Toggle, 'Teams_upload_adhoc', key);
+    }
+
     public sendOrganizersAnalytics(): void {
         const selectedOption = this._hostsOptions.find(item => item.value === this._profileForm.controls['coOrganizerRoles'].value);
         if (selectedOption) {
@@ -256,11 +258,12 @@ export class EditTeamsProfileComponent implements OnDestroy {
     public _save(): void {
         this._logger.info(`handle 'save' action by the user`);
         const formValue = this._profileForm.getRawValue();
-
         this._profile.name = formValue.name;
         this._profile.settings = {
             uploadRecordings: true,
             uploadTranscripts: formValue.transcripts,
+            // uploadAdHocRecordings: formValue.adhoc,
+            // uploadAdHocTranscripts: formValue.transcripts && formValue.adhoc,
             categories: formValue.categories.map(category => category.fullName ? category.fullName : category.name)
         }
 
@@ -282,13 +285,18 @@ export class EditTeamsProfileComponent implements OnDestroy {
         const userIdSuffixMethod = formValue.postfix === 0 ? 'none' : formValue.postfix === 1 ? 'remove' : 'append';
         Object.assign(this._profile.settings, {userIdSuffixMethod});
 
+        const userSearchMethod = formValue.userSearchMethod || TeamsIntegrationUserIdSearchMethod.Id;
+        Object.assign(this._profile.settings, {userSearchMethod});
+
         Object.assign(this._profile.settings, {userIdSuffix: formValue.userPostfix?.length ? formValue.userPostfix : ''});
 
         const userNotFoundMethod = formValue.createUser ? 'create' : 'assign-default';
         Object.assign(this._profile.settings, {userNotFoundMethod});
 
-        if (formValue.defaultUserId?.length) {
+        if (formValue.defaultUserId?.length && formValue.createUser === false) {
             Object.assign(this._profile.settings, {defaultUserId: formValue.defaultUserId[0].id});
+        } else {
+            Object.assign(this._profile.settings, {defaultUserId: ''});
         }
 
         this.onSave.emit(this._profile);
@@ -428,41 +436,7 @@ export class EditTeamsProfileComponent implements OnDestroy {
             this._searchUsersSubscription = null;
         }
 
-        this._searchUsersSubscription = this._kalturaServerClient.request(
-            new ESearchSearchUserAction({
-                searchParams: new KalturaESearchUserParams({
-                    searchOperator: new KalturaESearchUserOperator({
-                        operator: KalturaESearchOperatorType.orOp,
-                        searchItems: [
-                            new KalturaESearchUserItem({
-                                itemType: KalturaESearchItemType.startsWith,
-                                fieldName: KalturaESearchUserFieldName.screenName,
-                                searchTerm: event.query
-                            }),
-                            new KalturaESearchUserItem({
-                                itemType: KalturaESearchItemType.startsWith,
-                                fieldName: KalturaESearchUserFieldName.firstName,
-                                searchTerm: event.query.split(" ")[0]
-                            }),
-                            new KalturaESearchUserItem({
-                                itemType: KalturaESearchItemType.partial,
-                                fieldName: KalturaESearchUserFieldName.lastName,
-                                searchTerm: event.query
-                            }),
-                            new KalturaESearchUserItem({
-                                itemType: KalturaESearchItemType.startsWith,
-                                fieldName: KalturaESearchUserFieldName.userId,
-                                searchTerm: event.query
-                            })
-                        ]
-                    })
-                }),
-                pager: new KalturaFilterPager({
-                    pageIndex : 0,
-                    pageSize : 30
-                })
-            })
-        )
+        this._searchUsersSubscription = this._kalturaServerClient.request(buildUserSearchQuery(event.query))
             .pipe(cancelOnDestroy(this))
             .subscribe(
                 data => {

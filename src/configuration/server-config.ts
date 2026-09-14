@@ -118,9 +118,20 @@ export interface ServerConfig {
         mrEndpoint: {
             uri: string;
         },
+        agentsManagerEndpoint: {
+            uri: string;
+        },
         vendorIntegrationsEndpoint: {
             uri: string;
-        }
+        },
+        unisphereLoaderEndpoint?: {
+            uri?: string;
+        },
+        checklistEndpoint?: {
+            checklistItem?: string;
+            scriptUri?: string;
+            uri?: string;
+        };
     },
     analyticsServer?: {
         uri?: string

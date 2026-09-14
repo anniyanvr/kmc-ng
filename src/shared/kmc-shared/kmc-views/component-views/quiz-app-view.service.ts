@@ -48,19 +48,18 @@ export class QuizAppViewService extends KmcComponentViewBaseService<QuizAppViewA
     }
 
     private _isAvailableByPermission(): boolean {
-        return false;
+        return this._appPermissions.hasPermission(KMCPermissions.ADCUEPOINT_PLUGIN_PERMISSION);
     }
 
     private _isAvailableByData(args: QuizAppViewArgs): boolean {
         const { entry, hasSource} = args;
         const entryReady = entry.status === KalturaEntryStatus.ready;
-        const isEntryReplacing = entry.replacementStatus !== KalturaEntryReplacementStatus.none;
+        const isEntryReplacing = entry.replacementStatus && entry.replacementStatus !== KalturaEntryReplacementStatus.none;
         const isLiveEntry = entry.mediaType === KalturaMediaType.liveStreamFlash ||
             entry.mediaType === KalturaMediaType.liveStreamWindowsMedia ||
             entry.mediaType === KalturaMediaType.liveStreamRealMedia ||
             entry.mediaType === KalturaMediaType.liveStreamQuicktime;
-        const isExternalMedia = entry instanceof KalturaExternalMediaEntry;
-        const isEntryRelevant = [KalturaMediaType.video, KalturaMediaType.audio].indexOf(entry.mediaType) !== -1 && !isExternalMedia;
+        const isEntryRelevant = [KalturaMediaType.video, KalturaMediaType.audio].indexOf(entry.mediaType) !== -1;
 
         const result = hasSource && entryReady && !isEntryReplacing && isEntryRelevant && !isLiveEntry;
 
@@ -71,7 +70,6 @@ export class QuizAppViewService extends KmcComponentViewBaseService<QuizAppViewA
                 entryReady,
                 isLiveEntry,
                 isEntryReplacing,
-                isExternalMedia,
                 entryMediaType: entry.mediaType,
                 isEntryRelevant
             }

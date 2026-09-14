@@ -2,7 +2,7 @@ import {Component, ElementRef, OnDestroy, OnInit, Renderer2, ViewChild} from '@a
 import {NavigationEnd, Router} from '@angular/router';
 import {
     AppAnalytics,
-    AppAuthentication,
+    AppAuthentication, AppBootstrap,
     AppUserStatus,
     BrowserService,
     PartnerPackageTypes
@@ -17,9 +17,11 @@ import {globalConfig} from 'config/global';
 import {cancelOnDestroy} from '@kaltura-ng/kaltura-common';
 import {AppEventsService} from 'app-shared/kmc-shared';
 import {HideMenuEvent, ShowMenuEvent, ResetMenuEvent, UpdateMenuEvent} from 'app-shared/kmc-shared/events';
-import {KalturaPartnerStatus} from "kaltura-ngx-client";
+import {KalturaPartnerStatus} from 'kaltura-ngx-client';
 import { KPFLoginRedirects, KPFService } from "app-shared/kmc-shell/providers/kpf.service";
 import {AppLocalization} from "@kaltura-ng/mc-shared";
+import {KMCPermissions, KMCPermissionsService} from 'app-shared/kmc-shared/kmc-permissions';
+import {PubSubServiceType} from '@unisphere/runtime';
 
 @Component({
     selector: 'kKMCAppMenu',
@@ -36,6 +38,8 @@ export class AppMenuComponent implements OnInit, OnDestroy {
     @ViewChild('supportPopup', {static: true}) private _supportPopup: PopupWidgetComponent;
     @ViewChild('leftMenu', {static: true}) private leftMenu: ElementRef;
     private _appCachedVersionToken = 'kmc-cached-app-version';
+    private unisphereRuntime: any = null;
+    private unisphereCallbackUnsubscribe:  () => void = null;
 
     public _showChangelog = false;
     public _helpMenuOpened = false;
@@ -54,6 +58,7 @@ export class AppMenuComponent implements OnInit, OnDestroy {
     public _appUserStatus: AppUserStatus = null;
     public _connectingToKPF = false;
     public hideMainMenu = false;
+    public _agentsEnabled = false;
 
     menuConfig: KMCAppMenuItem[];
     leftMenuConfig: KMCAppMenuItem[];
@@ -67,6 +72,8 @@ export class AppMenuComponent implements OnInit, OnDestroy {
 
     constructor(public _kmcLogs: KmcLoggerConfigurator,
                 private _contextualHelpService: ContextualHelpService,
+                private _appPermissions: KMCPermissionsService,
+                private _bootstrapService: AppBootstrap,
                 public _userAuthentication: AppAuthentication,
                 private _kmcMainViews: KmcMainViewsService,
                 private _appLocalization: AppLocalization,
@@ -89,6 +96,7 @@ export class AppMenuComponent implements OnInit, OnDestroy {
             .subscribe((event) => {
                 if (event instanceof NavigationEnd) {
                     this.setSelectedRoute(event.urlAfterRedirects);
+                    this._agentsEnabled = event.urlAfterRedirects.indexOf('/analytics') === -1 && this._appPermissions.hasPermission(KMCPermissions.FEATURE_AGENTS_FRAMEWORK_PERMISSION);
                 }
             });
         this.menuConfig = this._kmcMainViews.getMenu();
@@ -153,6 +161,28 @@ export class AppMenuComponent implements OnInit, OnDestroy {
                 this.hideMainMenu = false;
             });
 
+        if (this._agentsEnabled) {
+            this._bootstrapService.unisphereWorkspace$
+                .pipe(cancelOnDestroy(this))
+                .subscribe(unisphereWorkspace => {
+                        if (unisphereWorkspace) {
+                            this.unisphereRuntime = unisphereWorkspace.getRuntime('unisphere.widget.agents', 'manager');
+                            this.unisphereCallbackUnsubscribe = unisphereWorkspace.getService<PubSubServiceType>('unisphere.service.pub-sub')?.subscribe('unisphere.event.module.agents.message-host-app', (data) => {
+                                const {action, entryId} = data.payload;
+                                switch (action) {
+                                    case 'entry':
+                                        // navigate to entry
+                                        this.unisphereRuntime?.closeDrawer(); // close widget
+                                        this.router.navigateByUrl('/content/entries/entry/' + entryId);
+                                        break;
+                                }
+                            })
+                        }
+                    },
+                    error => {
+                        console.error('Error initializing Unisphere workspace', error);
+                    })
+        }
     }
 
     private replaceMenu(menuID: string, menu: KMCAppMenuItem[]): void {
@@ -214,6 +244,16 @@ export class AppMenuComponent implements OnInit, OnDestroy {
 
 
     ngOnDestroy() {
+        if (this.unisphereCallbackUnsubscribe) {
+            this.unisphereCallbackUnsubscribe();
+            this.unisphereCallbackUnsubscribe = null;
+        }
+    }
+
+    public openAgents(): void {
+        if (this._agentsEnabled && this.unisphereRuntime) {
+            this.unisphereRuntime.openDrawer();
+        }
     }
 
     public _changelogPopupOpened(): void {

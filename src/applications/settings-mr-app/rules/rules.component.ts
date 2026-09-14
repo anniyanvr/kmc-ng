@@ -26,7 +26,6 @@ export class RulesComponent implements OnInit, OnDestroy {
     @ViewChild('deletePopup', { static: true }) public deletePopup: PopupWidgetComponent;
     @ViewChild('actionsmenu', { static: true }) private _actionsMenu: Menu;
 
-    private MAX_ALLOWED_PROFILES = 20;
     public _isBusy = false;
     public _profiles: ManagedTasksProfile[] = [];
     public _profilesCount = 0;
@@ -64,6 +63,9 @@ export class RulesComponent implements OnInit, OnDestroy {
         this._mrStore.loadProfiles(pageSize, pageIndex, sortField, sortOrder).subscribe(
             (response: LoadManagedTasksProfilesResponse) => {
                 this._isBusy = false;
+                this._profilesCount = 0;
+                this._profiles = [];
+                this._mrStore.rulesIds = [];
                 if (response.objects?.length) {
                     this._profiles = response.objects as ManagedTasksProfile[];
                     this._profiles.forEach(profile => { // mapping
@@ -111,11 +113,11 @@ export class RulesComponent implements OnInit, OnDestroy {
                 label: profile.status === 'enabled' ? this._appLocalization.get('applications.settings.mr.disable') : this._appLocalization.get('applications.settings.mr.enable'),
                 command: () => this._actionSelected('enable-disable', profile)
             },
-            // {
-            //     id: 'test-run',
-            //     label: this._appLocalization.get('applications.settings.mr.testRun'),
-            //     command: () => this._actionSelected('test-run', profile)
-            // },
+            {
+                id: 'test-run',
+                label: this._appLocalization.get('applications.settings.mr.testRun'),
+                command: () => this._actionSelected('test-run', profile)
+            },
             {
                 id: 'edit',
                 label: this._appLocalization.get('applications.settings.authentication.table.edit'),
@@ -137,6 +139,9 @@ export class RulesComponent implements OnInit, OnDestroy {
                 break;
             case "edit":
                 this._editProfile(profile);
+                break;
+            case "test-run":
+                this._testRun(profile);
                 break;
             case "delete":
                 this.deletePopup.open();
@@ -169,13 +174,9 @@ export class RulesComponent implements OnInit, OnDestroy {
     }
 
     public _addProfile(): void {
-        if (this._profilesCount >= this.MAX_ALLOWED_PROFILES) {
-            this.displayError(this._appLocalization.get('applications.settings.mr.maxRulesErr'));
-        } else {
-            this._logger.info(`handle add ManagedTasksProfile action by user`);
-            this._currentEditProfile = null;
-            this.newPopup.open();
-        }
+        this._logger.info(`handle add ManagedTasksProfile action by user`);
+        this._currentEditProfile = null;
+        this.newPopup.open();
     }
 
     public _editProfile(profile: ManagedTasksProfile, sendAnalytics = true): void {
@@ -186,6 +187,25 @@ export class RulesComponent implements OnInit, OnDestroy {
         this._logger.info(`handle edit ManagedTasksProfile action by user`);
         this._mrStore.selectedRule = profile;
         this._router.navigateByUrl(`/settings/mr/rule/${profile.id}`);
+    }
+
+    public _testRun(profile: ManagedTasksProfile): void {
+        this._blockerMessage = null;
+        this._isBusy = true;
+        this._mrStore.testRunProfile(profile).subscribe(
+            (response) => {
+                if (response && response.objectType && response.objectType === "KalturaAPIException") {
+                    // error returned from the server in the response
+                    this.displayError(response.message ? response.message : this._appLocalization.get('applications.settings.mr.dryRunError'));
+                } else {
+                    // success
+                    this._refresh();
+                }
+            },
+            error => {
+                this.displayError(this._appLocalization.get('applications.settings.mr.dryRunError'));
+            }
+        )
     }
 
     private displayError(error: string): void {

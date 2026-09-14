@@ -1,18 +1,13 @@
 import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
 import {Action} from '../actions.component';
-import {
-    ESearchSearchUserAction, KalturaClient, KalturaESearchItemType,
-    KalturaESearchOperatorType, KalturaESearchUserFieldName, KalturaESearchUserItem,
-    KalturaESearchUserOperator,
-    KalturaESearchUserParams, KalturaESearchUserResponse, KalturaESearchUserResult, KalturaFilterPager,
-    KalturaUser, KalturaUserFilter, UserListAction
-} from 'kaltura-ngx-client';
+import {KalturaClient, KalturaESearchUserResponse, KalturaESearchUserResult,   KalturaUser, KalturaUserFilter, UserListAction} from 'kaltura-ngx-client';
 import {ISubscription} from 'rxjs/Subscription';
 import {Observable, Subject} from 'rxjs';
 import {SuggestionsProviderData} from '@kaltura-ng/kaltura-primeng-ui';
 import {cancelOnDestroy} from '@kaltura-ng/kaltura-common';
 import {notificationTemplates} from './notification.templates';
 import {AppAnalytics, ButtonType} from 'app-shared/kmc-shell';
+import {buildUserSearchQuery, isHashed} from 'app-shared/kmc-shared';
 
 @Component({
     selector: 'kActionNotification',
@@ -73,7 +68,7 @@ import {AppAnalytics, ButtonType} from 'app-shared/kmc-shell';
                         </div>
                         <div class="kRow">
                             <span class="kLabel">{{'applications.settings.mr.notification.body' | translate}}</span>
-                            <textarea class="threeRows" pInputTextarea [(ngModel)]="action.task.taskParams.sendNotificationTaskParams.messageBody" (ngModelChange)="validate()"></textarea>
+                            <div [contentEditable]="true" class="threeRows" [innerHTML]="action.task.taskParams.sendNotificationTaskParams.messageBody" (blur)="onMessageBodyChange($event)"></div>
                         </div>
                     </div>
 
@@ -81,7 +76,7 @@ import {AppAnalytics, ButtonType} from 'app-shared/kmc-shell';
                         <button type="button" class="kButtonDefault" (click)="this.revert();editPopup.close()" pButton
                                 label="{{'app.common.cancel' | translate}}"></button>
                         <button pButton type="button" class="kButtonBranded" [label]="'app.common.apply' | translate"
-                                (click)="this.validate();editPopup.close()"></button>
+                                (click)="this.validate();this.updateActionChanges();editPopup.close()"></button>
                     </div>
                 </div>
             </ng-template>
@@ -135,6 +130,11 @@ export class ActionNotificationComponent implements OnDestroy{
         }
     }
 
+    public onMessageBodyChange(event): void {
+        this.action.task.taskParams.sendNotificationTaskParams.messageBody = event.target.innerHTML;
+        this.validate();
+    }
+
     public validate(): void {
         if (this.selected) {
             if (!this.action || this.action.requires === 'delete') {
@@ -161,6 +161,7 @@ export class ActionNotificationComponent implements OnDestroy{
                     this.action.task.taskParams.sendNotificationTaskParams.daysToWait = 3;
                 }
                 this.originalAction = JSON.parse(JSON.stringify((this.action))); // save for revert
+                this.onActionChange.emit(this.action);
             } else {
                 // update
                 if (this.action.task?.id) {
@@ -178,9 +179,8 @@ export class ActionNotificationComponent implements OnDestroy{
         } else {
             // remove notification
             this.action.requires = 'delete';
+            this.onActionChange.emit(this.action);
         }
-
-        this.onActionChange.emit(this.action);
     }
 
     public sendMainAnalytics(): void {
@@ -209,6 +209,13 @@ export class ActionNotificationComponent implements OnDestroy{
         }
     }
 
+    public updateActionChanges(): void {
+        if (this.action) {
+            this.originalAction = JSON.parse(JSON.stringify(this.action));
+        }
+        this.onActionChange.emit(this.action);
+    }
+
     // --------------------------- users auto complete code --------------------------
     private loadUsers(): void {
         const userIds = this.action?.task?.taskParams?.sendNotificationTaskParams?.recipients?.userIds?.toString() || '';
@@ -232,41 +239,7 @@ export class ActionNotificationComponent implements OnDestroy{
     private searchUsers(text : string) {
         return Observable.create(
             observer => {
-                const requestSubscription: ISubscription = this._kalturaServerClient.request(
-                    new ESearchSearchUserAction({
-                        searchParams: new KalturaESearchUserParams({
-                            searchOperator: new KalturaESearchUserOperator({
-                                operator: KalturaESearchOperatorType.orOp,
-                                searchItems: [
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.startsWith,
-                                        fieldName: KalturaESearchUserFieldName.screenName,
-                                        searchTerm: text
-                                    }),
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.startsWith,
-                                        fieldName: KalturaESearchUserFieldName.firstName,
-                                        searchTerm: text.split(" ")[0]
-                                    }),
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.partial,
-                                        fieldName: KalturaESearchUserFieldName.lastName,
-                                        searchTerm: text
-                                    }),
-                                    new KalturaESearchUserItem({
-                                        itemType: KalturaESearchItemType.startsWith,
-                                        fieldName: KalturaESearchUserFieldName.userId,
-                                        searchTerm: text
-                                    })
-                                ]
-                            })
-                        }),
-                        pager: new KalturaFilterPager({
-                            pageIndex : 0,
-                            pageSize : 30
-                        })
-                    })
-                )
+                const requestSubscription: ISubscription = this._kalturaServerClient.request(buildUserSearchQuery(text))
                     .pipe(cancelOnDestroy(this))
                     .subscribe(
                         (result: KalturaESearchUserResponse) =>
@@ -292,6 +265,10 @@ export class ActionNotificationComponent implements OnDestroy{
             });
     }
 
+    public getUnhashedField(value: KalturaUser): string  {
+        return isHashed(value['id']) ? value['email'] || value['fullName'] || value['screenName'] : value['id'];
+    };
+
     public _searchUsers(event, formControl?) : void {
         this._usersProvider.next({ suggestions : [], isLoading : true});
 
@@ -305,7 +282,7 @@ export class ActionNotificationComponent implements OnDestroy{
         this._searchUsersSubscription = this.searchUsers(event.query).subscribe(data => {
                 const suggestions = [];
                 (data || []).forEach((suggestedUser: KalturaUser) => {
-                    suggestedUser['__tooltip'] = suggestedUser.id;
+                    suggestedUser['__tooltip'] = this.getUnhashedField(suggestedUser);
                     let isSelectable = true;
                     if (formControl){
                         isSelectable = !this.owners.find(user => {
@@ -313,7 +290,7 @@ export class ActionNotificationComponent implements OnDestroy{
                         });
                     }
                     suggestions.push({
-                        name: `${suggestedUser.screenName} (${suggestedUser.id})`,
+                        name: `${this.getUnhashedField(suggestedUser)} (${suggestedUser.id})`,
                         item: suggestedUser,
                         isSelectable: isSelectable
                     });

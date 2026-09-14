@@ -4,11 +4,16 @@ import { cancelOnDestroy } from '@kaltura-ng/kaltura-common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { serverConfig } from "config/server";
 import { AppAuthentication } from "app-shared/kmc-shell";
-import {KalturaWebexAPIIntegrationSetting, WebexVendorListAction, WebexVendorSubmitRegistrationAction} from 'kaltura-ngx-client';
 
 export enum SortDirection {
     Desc = -1,
     Asc = 1
+}
+
+export enum TeamsIntegrationUserIdSearchMethod {
+    Id = 'id',
+    Email = 'email',
+    All = 'all',
 }
 
 export type KalturaPager = {
@@ -19,9 +24,12 @@ export type KalturaPager = {
 export type TeamsIntegrationSettings = {
     uploadRecordings: boolean;
     uploadTranscripts: boolean;
+    // uploadAdHocRecordings: boolean;
+    // uploadAdHocTranscripts: boolean;
     categories?: string[];
     userGroupsInclude?: any[];
     userGroupsExclude?: any[];
+    userSearchMethod?: TeamsIntegrationUserIdSearchMethod;
     userIdSource?: 'upn' | 'azure-id';
     userIdSuffixMethod?: 'remove' | 'append';
     userIdSuffix?: string;
@@ -66,7 +74,7 @@ export class TeamsService implements OnDestroy {
 
     public loadTeamsIntegrationProfiles(filter: any = {}): Observable<LoadTeamsIntegrationResponse> {
         try {
-            return this._http.post(`${serverConfig.externalServices.vendorIntegrationsEndpoint.uri}/teams-integration/list`, filter, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<LoadTeamsIntegrationResponse>;
+            return this._http.post(`${serverConfig.externalServices.vendorIntegrationsEndpoint.uri}/teams-integration/list`, {filter}, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<LoadTeamsIntegrationResponse>;
         } catch (ex) {
             return throwError(new Error('An error occurred while trying to load teams integrations list'));
         }

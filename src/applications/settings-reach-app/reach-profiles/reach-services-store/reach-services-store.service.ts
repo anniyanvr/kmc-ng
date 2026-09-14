@@ -14,9 +14,13 @@ import {
     KalturaVendorCatalogItem,
     KalturaVendorCatalogItemListResponse,
     KalturaVendorChapteringCatalogItemFilter,
+    KalturaVendorLiveCaptionCatalogItemFilter,
     KalturaVendorServiceFeature,
     KalturaVendorTranslationCatalogItemFilter,
-    VendorCatalogItemListAction
+    VendorCatalogItemListAction,
+    KalturaVendorExtendedAudioDescriptionCatalogItemFilter,
+    KalturaVendorSignLanguageCatalogItemFilter,
+    KalturaVendorLiveTranslationCatalogItemFilter,
 } from 'kaltura-ngx-client';
 import {KalturaFilterPager} from 'kaltura-ngx-client';
 import {BrowserService} from 'shared/kmc-shell/providers/browser.service';
@@ -127,6 +131,9 @@ export class ReachServicesStore extends FiltersStoreBase<ReachServicesFilters> i
                 case KalturaVendorServiceFeature.translation:
                     filter = new KalturaVendorTranslationCatalogItemFilter({});
                     break;
+                case KalturaVendorServiceFeature.liveCaption:
+                    filter = new KalturaVendorLiveCaptionCatalogItemFilter({});
+                    break;
                 case KalturaVendorServiceFeature.alignment:
                     filter = new KalturaVendorAlignmentCatalogItemFilter({});
                     break;
@@ -135,6 +142,15 @@ export class ReachServicesStore extends FiltersStoreBase<ReachServicesFilters> i
                     break;
                 case KalturaVendorServiceFeature.chaptering:
                     filter = new KalturaVendorChapteringCatalogItemFilter({});
+                    break;
+                case KalturaVendorServiceFeature.extendedAudioDescription:
+                    filter = new KalturaVendorExtendedAudioDescriptionCatalogItemFilter({});
+                    break;
+                case KalturaVendorServiceFeature.signLanguage:
+                    filter = new KalturaVendorSignLanguageCatalogItemFilter({});
+                    break;
+                case KalturaVendorServiceFeature.liveTranslation:
+                    filter = new KalturaVendorLiveTranslationCatalogItemFilter({});
                     break;
             }
             const data: ReachServicesFilters = this._getFiltersAsReadonly();

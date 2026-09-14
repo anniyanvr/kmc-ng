@@ -7,6 +7,12 @@
     box-sizing: border-box;
     border-radius: 4px;
     border: 1px solid $kGrayscale4;
+    .kWrapRaw {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        width: 100%;
+    }
     .kRow {
         display: flex;
         margin-top: 24px;
@@ -15,7 +21,16 @@
         }
         .kLabel {
             line-height: 24px;
-            width: 208px;
+            width: 180px;
+            flex: 0 0 auto;
+            &.topGap {
+                margin-top: 7px;
+            }
+        }
+        .kFormLabel {
+            line-height: 24px;
+            margin-right: 8px;
+            margin-left: 8px;
             flex: 0 0 auto;
         }
         .kLabelWithHelpTip {
@@ -38,12 +53,15 @@
         kinputhelper {
             padding-top: 4px;
         }
+        kautocomplete ::ng-deep input {
+            width: 200px;
+        }
     }
     .kDelete {
         color: $kDandger;
         cursor: pointer;
         font-weight: 700;
-        margin-left: 208px;
+        margin-left: 180px;
         margin-top: 24px;
         display: block;
         display: inline-block;
@@ -52,7 +70,47 @@
         display: flex;
         flex-direction: column;
         a {
-            margin-top: 16px;
+            margin-top: 8px;
         }
+    }
+    .kCheckbox {
+        margin-top: 4px;
+        &.row {
+            margin-top: 0px;
+            margin-right: 8px;
+        }
+        ::ng-deep .p-checkbox-label {
+            font-weight: normal;
+        }
+        ::ng-deep .p-checkbox {
+            margin-right: 0px;
+        }
+    }
+    .kDatePicker {
+        margin-left: 16px;
+        ::ng-deep input {
+            width: 150px !important;
+        }
+    }
+    .kRadio {
+        &:last-child {
+            margin-left: 24px;
+        }
+    }
+    .slider {
+        margin-left: 187px;
+        margin-top: 24px;
+        margin-right: 24px;
+        display: block;
+    }
+    .sliderValue{
+        margin-left: 340px;
+        margin-top: 12px;
+        display: block;
+    }
+}
+@media screen and (max-width: 1310px) {
+    .criteria .wrapDropdown {
+        margin-top: 8px;
     }
 }

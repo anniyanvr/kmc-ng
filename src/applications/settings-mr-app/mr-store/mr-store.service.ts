@@ -35,6 +35,7 @@ export type ManagedTasksProfile = {
     ownerId: string;
     partnerId: number;
     description: string;
+    type: 'entryProfile' | 'liveEntryProfile';
     objectFilter?: any;
     objectFilterType?: string;
     status: 'deleted' | 'disabled' | 'enabled';
@@ -82,7 +83,7 @@ export type RequestObject = {
 
 export type Task = {
     id?: string;
-    type: 'deleteEntry' | 'deleteFlavors' | 'sendNotification' | 'modifyEntry' | 'generateReport';
+    type: 'deleteEntry' | 'deleteFlavors' | 'sendNotification' | 'modifyEntry' | 'generateReport' | 'triggerAgent';
     managedTasksProfileId?: string;
     status?: 'deleted' | 'disabled' | 'enabled';
     taskParams?: {
@@ -96,6 +97,9 @@ export type Task = {
                 behavior: 'applyAction' | 'expose',
                 tag?: string
             }
+        },
+        agentTaskParams?: {
+            agentId?: string;
         },
         modifyEntryTaskParams?: {
             kalturaEntry?: any,
@@ -152,7 +156,7 @@ export class MrStoreService implements OnDestroy {
 
     // ------------------------- Managed tasks profiles API ---------------------------- //
 
-    public loadProfiles(pageSize: number, pageIndex: number, sortField: string, sortOrder: number, idIn: string[] = []): Observable<LoadManagedTasksProfilesResponse> {
+    public loadProfiles(pageSize: number, pageIndex: number, sortField: string, sortOrder: number, idIn: string[] = [], includeAllStatuses = false): Observable<LoadManagedTasksProfilesResponse> {
         const pager: KalturaPager = {
             pageIndex,
             pageSize
@@ -161,6 +165,9 @@ export class MrStoreService implements OnDestroy {
         const body = {pager, orderBy};
         if (idIn.length) {
             Object.assign(body, {idIn});
+        }
+        if (includeAllStatuses) {
+            Object.assign(body, {statusIn: ["enabled", "disabled", "deleted"]});
         }
         try {
             return this._http.post(`${serverConfig.externalServices.mrEndpoint.uri}/managedTasksProfile/list`, body, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<LoadManagedTasksProfilesResponse>;
@@ -192,6 +199,15 @@ export class MrStoreService implements OnDestroy {
             return throwError(new Error('An error occurred while trying to update managed tasks profile ' + profile.id));
         }
     }
+
+    public testRunProfile(profile: ManagedTasksProfile): Observable<any> {
+        try {
+            return this._http.post(`${serverConfig.externalServices.mrEndpoint.uri}/managedTasksProfile/dryRun`, {id: profile.id}, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<any>;
+        } catch (ex) {
+            return throwError(new Error('An error occurred while trying to dry run managed tasks profile ' + profile.id));
+        }
+    }
+
     public loadProfile(id: string): Observable<any> {
         try {
             return this._http.post(`${serverConfig.externalServices.mrEndpoint.uri}/managedTasksProfile/get`, {id}, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<any>;
@@ -273,6 +289,18 @@ export class MrStoreService implements OnDestroy {
             return this._http.post(`${serverConfig.externalServices.mrEndpoint.uri}/task/list`, {managedTasksProfileId}, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<LoadTasksResponse>;
         } catch (ex) {
             return throwError(new Error('An error occurred while trying to load tasks list'));
+        }
+    }
+
+    public loadAgents(): Observable<any> {
+        try {
+            const pager = {pageIndex: 0, pageSize: 500};
+            const orderBy = '-createdAt';
+            const partnerId = this._appAuthentication.appUser.partnerId;
+            const body = {pager, orderBy};
+            return this._http.post(`${serverConfig.externalServices.agentsManagerEndpoint.uri}/agent/list`, {orderBy, pager, partnerId}, this.getHttpOptions()).pipe(cancelOnDestroy(this)) as Observable<any>;
+        } catch (ex) {
+            return throwError(new Error('An error occurred while trying to save actions'));
         }
     }
 

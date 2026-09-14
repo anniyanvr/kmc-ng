@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { AppAuthentication, BrowserService } from 'app-shared/kmc-shell';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
-import { UsersStore } from './users.service';
+import {ExtendedKalturaUser, UsersStore} from './users.service';
 import { Menu } from 'primeng/menu';
 import { AreaBlockerMessage } from '@kaltura-ng/kaltura-ui';
 import { KalturaSourceType, KalturaUser } from 'kaltura-ngx-client';
@@ -43,6 +43,7 @@ export class UsersTableComponent implements OnInit, OnDestroy, AfterViewInit {
   @Output() editUser = new EventEmitter<KalturaUser>();
   @Output() toggleUserStatus = new EventEmitter<KalturaUser>();
   @Output() deleteUser = new EventEmitter<KalturaUser>();
+  @Output() demoteUser = new EventEmitter<KalturaUser>();
 
   private _partnerInfo: PartnerInfo = { adminLoginUsersQuota: 0, adminUserId: null };
 
@@ -138,7 +139,8 @@ export class UsersTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
       this._items = [{
           id: 'edit', label: this._appLocalization.get('applications.content.table.edit'),
-          command: () => this.editUser.emit(user)
+          command: () => this.editUser.emit(user),
+          disabled: user.roleNames !== (user as ExtendedKalturaUser).roleName
       }];
 
       if (this._analyticsAllowed) {
@@ -147,7 +149,7 @@ export class UsersTableComponent implements OnInit, OnDestroy, AfterViewInit {
               label: this._appLocalization.get('applications.content.table.analytics'),
               command: () => {
                   this._router.navigate(['analytics/user'], { queryParams: { id: user.id } });
-              },
+              }
           });
       }
 
@@ -160,6 +162,17 @@ export class UsersTableComponent implements OnInit, OnDestroy, AfterViewInit {
                   command: () => this.toggleUserStatus.emit(user)
               },
               {
+                  id: 'demoteAdmin', label: this._appLocalization.get('applications.administration.users.remove'),
+                  command: () => {
+                        this._browserService.confirm({
+                            header: this._appLocalization.get('applications.administration.users.demote'),
+                            message: this._appLocalization.get('applications.administration.users.confirmDemote', {0: user.fullName}),
+                            acceptLabel: this._appLocalization.get('applications.administration.users.demote'),
+                            accept: () => this.demoteUser.emit(user)
+                        });
+                  }
+              },
+              {
                   id: 'delete', label: this._appLocalization.get('applications.content.table.delete'),
                   styleClass: 'kDanger', command: () => {
                   this._browserService.confirm({
@@ -167,7 +180,7 @@ export class UsersTableComponent implements OnInit, OnDestroy, AfterViewInit {
                       message: this._appLocalization.get('applications.administration.users.confirmDelete', {0: user.fullName}),
                       accept: () => this.deleteUser.emit(user)
                   });
-              }
+                }
               }
           );
           this._permissionsService.filterList(<{ id: string }[]>this._items,

@@ -47,6 +47,7 @@ export class EditUserComponent implements OnInit, OnDestroy {
   public _saveBtnShown = false;
   public _idServerError = false;
   public _emailServerError = false;
+  public _isHashedUserId = false;
 
   public _showSsoUser = false;
   private disableSsoUserCB = false;
@@ -123,6 +124,11 @@ export class EditUserComponent implements OnInit, OnDestroy {
           this._userForm.get('firstName').disable();
           this._userForm.get('lastName').disable();
 
+          this._isHashedUserId = this.user.externalId !== null && this.user.externalId !== undefined && this.user.externalId.length > 0;
+            if (this._isHashedUserId) {
+                this._idField.disable();
+            }
+
             const isUserAdmin = this.user.id === this._partnerInfo.adminUserId;
             const isCurrentUser = this._usersStore.isCurrentUser(this.user);
           if (isUserAdmin || isCurrentUser) {
@@ -170,41 +176,72 @@ export class EditUserComponent implements OnInit, OnDestroy {
 
     const { email } = this._userForm.value;
     this._isBusy = true;
-    this._usersStore.isUserAlreadyExists(email)
-      .pipe(cancelOnDestroy(this))
-      .subscribe((status) => {
-        this._isBusy = false;
 
-        if (status !== null) {
-            switch (status) {
-                case IsUserExistsStatuses.kmcUser:
-                    this._browserService.alert({
-                        header: this._appLocalization.get('app.common.attention'),
-                        message: this._appLocalization.get('applications.administration.users.alreadyExistError', {0: email})
-                    });
-                    break;
-                case IsUserExistsStatuses.otherKMCUser:
-                    this._browserService.confirm({
-                            header: this._appLocalization.get('applications.administration.users.alreadyExist'),
-                            message: this._appLocalization.get('applications.administration.users.userAlreadyExist', {0: email}),
-                            accept: () => this._createOrAssociateUser()
+    this._usersStore.isExternalUser(email)
+        .pipe(cancelOnDestroy(this))
+        .subscribe((user: KalturaUser | null) => {
+            const isExternal = user !== null;
+            this._usersStore.isUserAlreadyExists(email)
+                .pipe(cancelOnDestroy(this))
+                .subscribe((status) => {
+                    this._isBusy = false;
+
+                    if (status !== null) {
+                        switch (status) {
+                            case IsUserExistsStatuses.kmcUser:
+                                this._browserService.alert({
+                                    header: this._appLocalization.get('app.common.attention'),
+                                    message: this._appLocalization.get('applications.administration.users.alreadyExistError', {0: email})
+                                });
+                                break;
+                            case IsUserExistsStatuses.otherKMCUser:
+                                if (isExternal) {
+                                    this._browserService.alert({
+                                        header: this._appLocalization.get('app.common.attention'),
+                                        message: this._appLocalization.get('applications.administration.users.duplicatedUser', {0: email})
+                                    });
+                                } else {
+                                    this._browserService.confirm({
+                                            header: this._appLocalization.get('applications.administration.users.alreadyExist'),
+                                            message: this._appLocalization.get('applications.administration.users.userAlreadyExist', {0: email}),
+                                            accept: () => this._createOrAssociateUser()
+                                        }
+                                    );
+                                }
+                                break;
+                            case IsUserExistsStatuses.unknownUser:
+                                if (isExternal) {
+                                    this._browserService.confirm({
+                                            header: this._appLocalization.get('applications.administration.users.alreadyExist'),
+                                            message: this._appLocalization.get('applications.administration.users.userAlreadyExist', {0: email}),
+                                            accept: () => this._associateUserToAccount(email, user)
+                                        }
+                                    );
+                                } else {
+                                    this._createOrAssociateUser();
+                                }
+                                break;
                         }
-                    );
-                    break;
-                case IsUserExistsStatuses.unknownUser:
-                    this._createOrAssociateUser();
-                    break;
-            }
-        }else {
-            this._blockerMessage = new AreaBlockerMessage({
-                message: this._appLocalization.get('applications.administration.users.commonError'),
-                buttons: [{
-                    label: this._appLocalization.get('app.common.ok'),
-                    action: () => this._blockerMessage = null
-                }]
-            });
-        }
-      });
+                    } else {
+                        if (isExternal) {
+                            this._browserService.confirm({
+                                    header: this._appLocalization.get('applications.administration.users.alreadyExist'),
+                                    message: this._appLocalization.get('applications.administration.users.userAlreadyExist', {0: email}),
+                                    accept: () => this._createOrAssociateUser()
+                                }
+                            );
+                        } else {
+                            this._blockerMessage = new AreaBlockerMessage({
+                                message: this._appLocalization.get('applications.administration.users.commonError'),
+                                buttons: [{
+                                    label: this._appLocalization.get('app.common.ok'),
+                                    action: () => this._blockerMessage = null
+                                }]
+                            });
+                        }
+                    }
+                });
+        });
   }
 
   private _updateUser(): void {
@@ -214,7 +251,7 @@ export class EditUserComponent implements OnInit, OnDestroy {
 
     const { roleIds, id, email, ssoUser } = this._userForm.getRawValue();
     const userData = this._showSsoUser ? { roleIds, email, id: (id || '').trim(), ssoUser } : { roleIds, email, id: (id || '').trim() };
-    this._usersStore.updateUser(userData, this.user.id)
+    this._usersStore.updateUser(userData, this.user.id, this._isHashedUserId)
       .pipe(tag('block-shell'))
       .pipe(cancelOnDestroy(this))
       .subscribe(

@@ -5,14 +5,11 @@
             <div class="kUsersDetails">
                 <div class="kRow">
                     <span class="kLabels">{{'applications.content.entryDetails.users.creator' | translate}}</span>
-                    <span [kTooltip]="_widgetService._creator">{{_widgetService._creator}}</span>
+                    <span [kTooltip]="getUnhashedField(_widgetService._creator)">{{getUnhashedField(_widgetService._creator)}}</span>
                 </div>
                 <div class="kRow">
                     <span class="kLabels">{{'applications.content.entryDetails.users.owner' | translate}}</span>
-                    <span
-                        [kTooltip]="_widgetService._owner?.screenName ? _widgetService._owner?.screenName : _widgetService._owner?.id">
-            {{_widgetService._owner?.screenName ? _widgetService._owner?.screenName : _widgetService._owner?.id}}
-          </span>
+                    <span [kTooltip]="getUnhashedField(_widgetService._owner)">{{getUnhashedField(_widgetService._owner)}}</span>
                     <a class="changeOwner"
                        *ngIf="_kmcPermissions.CONTENT_MANAGE_ENTRY_USERS | kNgIfPermitted"
                        (click)="_openChangeOwner()">{{'applications.content.entryDetails.users.changeOwner' | translate}}</a>
@@ -25,10 +22,10 @@
                                    suggestionLabelField="name"
                                    [tooltipResolver]="'__tooltip'"
                                    [classField]="'__class'"
-                                   field="id"
+                                   [field]="getUnhashedField"
                                    [allowMultiple]="true"
                                    [onItemAdding]="_convertUserInputToValidValue"
-                                   [limitToSuggestions]="false"
+                                   [limitToSuggestions]="true"
                                    [minLength]="3"
                                    suggestionSelectableField="isSelectable"
                                    [suggestionsProvider]="_usersProvider"
@@ -40,12 +37,12 @@
                     <kAutoComplete formControlName="publishers"
                                    suggestionItemField="item"
                                    suggestionLabelField="name"
-                                   field="screenName"
+                                   [field]="getUnhashedField"
                                    [allowMultiple]="true"
                                    [tooltipResolver]="'__tooltip'"
                                    [classField]="'__class'"
                                    [onItemAdding]="_convertUserInputToValidValue"
-                                   [limitToSuggestions]="false"
+                                   [limitToSuggestions]="true"
                                    [minLength]="3"
                                    suggestionSelectableField="isSelectable"
                                    [suggestionsProvider]="_usersProvider"
@@ -57,12 +54,12 @@
                     <kAutoComplete formControlName="viewers"
                                    suggestionItemField="item"
                                    suggestionLabelField="name"
-                                   field="id"
+                                   [field]="getUnhashedField"
                                    [allowMultiple]="true"
                                    [tooltipResolver]="'__tooltip'"
                                    [classField]="'__class'"
                                    [onItemAdding]="_convertUserInputToValidValue"
-                                   [limitToSuggestions]="false"
+                                   [limitToSuggestions]="true"
                                    [minLength]="3"
                                    suggestionSelectableField="isSelectable"
                                    [suggestionsProvider]="_usersProvider"
@@ -85,12 +82,12 @@
                         <kAutoComplete formControlName="owners"
                                        suggestionItemField="item"
                                        suggestionLabelField="name"
-                                       field="screenName"
+                                       [field]="getUnhashedField"
                                        [onItemAdding]="_convertUserInputToValidValue"
                                        [allowMultiple]="false"
                                        [tooltipResolver]="'__tooltip'"
                                        [classField]="'__class'"
-                                       [limitToSuggestions]="false"
+                                       [limitToSuggestions]="true"
                                        placeholder="{{'applications.content.entryDetails.users.changeOwnerPH' | translate}}"
                                        [minlength]="3"
                                        [suggestionsProvider]="_usersProvider"

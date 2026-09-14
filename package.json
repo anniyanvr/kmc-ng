@@ -1,6 +1,6 @@
 {
   "name": "kmc-ng",
-  "version": "7.21.3",
+  "version": "7.42.5",
   "license": "AGPL-3.0",
   "private": true,
   "repository": {
@@ -11,6 +11,9 @@
   "keywords": [
     "kaltura"
   ],
+  "overrides": {
+    "moment": "2.30.1"
+  },
   "author": {
     "name": "Kaltura Community",
     "email": "community@kaltura.com"
@@ -18,21 +21,12 @@
   "bugs": {
     "url": "https://github.com/kaltura/kmc-ng/issues"
   },
-  "contributors": [
-    {
-      "name": "Eran Sakal",
-      "email": "eran@sakalim.com"
-    },
-    {
-      "name": "Amir Chervinsky",
-      "email": "amir.chr@gmail.com"
-    }
-  ],
   "homepage": "https://github.com/kaltura/kmc-ng#readme",
   "scripts": {
     "setup": "node ./scripts/setup.js",
     "build": "ng build",
-    "build:prod": "node --max_old_space_size=8092 ./node_modules/@angular/cli/bin/ng build --prod",
+    "build:prod-old": "node --max_old_space_size=8092 ./node_modules/@angular/cli/bin/ng build --prod",
+    "build:prod": "node scripts/build-prod.js $1",
     "build:analyze": "node --max_old_space_size=8092 ./node_modules/@angular/cli/bin/ng build --prod--preserve-symlinks --aot --extract-licenses --named-chunks --stats-json && webpack-bundle-analyzer dist/stats.json",
     "kws": "kws",
     "lint": "ng lint",
@@ -67,14 +61,19 @@
     "@kaltura-ng/mc-theme": "~5.0.3",
     "@ngx-translate/core": "~13.0.0",
     "@ngx-translate/http-loader": "~6.0.0",
+    "@unisphere/cli": "~1.51.3",
+    "@unisphere/core": "~1.75.8",
+    "@unisphere/runtime": "~1.75.8",
+    "@unisphere/runtime-js": "~1.74.0",
     "angularx-qrcode": "~10.0.11",
     "core-js": "^3.2.1",
+    "fs-extra": "^11.3.3",
     "intl": "^1.2.5",
     "jquery": "~3.7.1",
     "jsnlog": "~2.26.2",
     "jsonschema": "~1.4.0",
-    "kaltura-ngx-client": "file:libs/kaltura-ngx-client-12.0.0-v20240328-112325.tgz",
-    "moment": "~2.22.2",
+    "kaltura-ngx-client": "file:libs/kaltura-ngx-client-12.0.0-v20260712-105151.tgz",
+    "moment": "2.30.1",
     "ngx-page-scroll": "~5.0.1",
     "ngx-webstorage": "~5.0.0",
     "normalize.css": "~8.0.1",

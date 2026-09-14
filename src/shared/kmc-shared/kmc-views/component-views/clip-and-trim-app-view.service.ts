@@ -58,9 +58,10 @@ export class ClipAndTrimAppViewService extends KmcComponentViewBaseService<ClipA
     private _isAvailableByData(args: ClipAndTrimAppViewArgs): boolean {
         const { entry, hasSource} = args;
         const entryReady = entry.status === KalturaEntryStatus.ready;
-        const isEntryReplacing = entry.replacementStatus !== KalturaEntryReplacementStatus.none;
+        const isEntryReplacing = entry.replacementStatus && entry.replacementStatus !== KalturaEntryReplacementStatus.none;
         const isExternalMedia = entry instanceof KalturaExternalMediaEntry;
-        const isEntryRelevant = [KalturaMediaType.video, KalturaMediaType.audio].indexOf(entry.mediaType) !== -1 && !isExternalMedia;
+        const isEntryRelevant = [KalturaMediaType.video, KalturaMediaType.audio].indexOf(entry.mediaType) !== -1;
+
         const isLiveEntry = [
             KalturaMediaType.liveStreamFlash,
             KalturaMediaType.liveStreamWindowsMedia,
@@ -68,7 +69,11 @@ export class ClipAndTrimAppViewService extends KmcComponentViewBaseService<ClipA
             KalturaMediaType.liveStreamQuicktime
         ].indexOf(entry.mediaType) !== -1;
         const isAvailableForLive = isLiveEntry && !!(<KalturaLiveEntry>entry).recordedEntryId;
-        const isAvailableForMedia = !isLiveEntry && isEntryRelevant && hasSource && entryReady && !isEntryReplacing;
+
+        let isAvailableForMedia = !isLiveEntry && isEntryRelevant && entryReady && !isEntryReplacing;
+        isAvailableForMedia = isExternalMedia ? isAvailableForMedia : isAvailableForMedia  && hasSource;
+
+
         const result = isAvailableForMedia || isAvailableForLive;
 
         this._logger.trace(`conditions used to check availability status by data`, () => (

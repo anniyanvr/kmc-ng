@@ -301,6 +301,7 @@ export class EntriesStoreDataProvider implements EntriesDataProvider, OnDestroy 
             });
           }
 
+          // filter categories
           if (data.categories && data.categories.length) {
             const categoriesValue = data.categories.map(item => item).join(',');
             if (data.categoriesMode === CategoriesModes.SelfAndChildren) {
@@ -308,6 +309,8 @@ export class EntriesStoreDataProvider implements EntriesDataProvider, OnDestroy 
             } else {
               filter.categoriesIdsMatchOr = categoriesValue;
             }
+          } else if (data.uncategorizedCategories === true) {
+              filter.categoriesIdsEmpty = KalturaNullableBoolean.trueValue;
           }
 
           // remove advanced search arg if it is empty
@@ -364,7 +367,7 @@ export class EntriesStoreDataProvider implements EntriesDataProvider, OnDestroy 
   public executeQuery(data: EntriesFilters): Observable<{ entries: KalturaBaseEntry[], totalCount?: number }> {
     const responseProfile: KalturaDetachedResponseProfile = new KalturaDetachedResponseProfile({
       type: KalturaResponseProfileType.includeFields,
-      fields: 'id,name,thumbnailUrl,mediaType,plays,createdAt,duration,status,startDate,endDate,moderationStatus,moderationCount,tags,adminTags,categoriesIds,downloadUrl,sourceType,entitledUsersPublish,entitledUsersView,entitledUsersEdit,externalSourceType,capabilities'
+      fields: 'id,name,thumbnailUrl,mediaType,plays,createdAt,duration,status,startDate,endDate,moderationStatus,moderationCount,tags,adminTags,categoriesIds,downloadUrl,sourceType,entitledUsersPublish,entitledUsersView,entitledUsersEdit,externalSourceType,capabilities,redirectEntryId,recordedEntryId'
     });
     let pagination: KalturaFilterPager = null;
 
@@ -421,6 +424,7 @@ export class EntriesStoreDataProvider implements EntriesDataProvider, OnDestroy 
       flavors: [],
       distributions: [], categories: [],
       categoriesMode,
+      uncategorizedCategories: false,
       customMetadata: {},
       limits: 200,
       youtubeVideo: false,

@@ -2,9 +2,15 @@
 <html>
 <head>
     <style>
+        html {
+            width: 100%;
+            height: 100%;
+        }
         body {
             display: flex;
             justify-content: center;
+            width: 100%;
+            height: 100%;
         }
     </style>
     <script src="https://static.kaltura.com/content/static/player-scripts/thumbnail-embed.js"></script>
@@ -19,6 +25,9 @@
           }
           if (e.origin === window.location.origin && e.data.messageType === 'getCurrentTime') {
               window.parent.postMessage({ 'messageType': 'currentTime', currentTime:  kPlayer.currentTime}, window.location.origin);
+          }
+          if (e.origin === window.location.origin && e.data.messageType === 'pause' && kPlayer) {
+              kPlayer.pause();
           }
           if (e.origin === window.location.origin && e.data.messageType === 'embed') {
               const embedParams = e.data.embedParams;
@@ -48,7 +57,7 @@
                           document.body.appendChild(template.content.firstChild);
                           break;
                       case 'auto':
-                          const style = '<style>html, body {margin: 0; padding: 0; width: 100%; height: 100%; } #framePlayerContainer {display: flex; justify-content: center; }</style>';
+                          const style = '<style>html, body {margin: 0; padding: 0; width: 100%; height: 100%; } #framePlayerContainer {display: flex; justify-content: center; width: 100%; height: 100%;}</style>';
                           const seo = embedParams.htmlContent ? embedParams.htmlContent : '';
                           document.open();
                           document.write('<!doctype html><html><head>' + style + '</head><body><div id="framePlayerContainer">' + seo + '<script src="' + embedParams.scriptUrl + '"></' + 'script></div></body></html>');
@@ -99,10 +108,17 @@
                                               kPlayer['loadMedia']({entryId: embedParams.embedParameters.entry_id});
                                           }
                                       } else {
-                                          window['__thumbnailEmbed']({
-                                              config: {...playerOptions},
-                                              mediaInfo: {entryId: embedParams.embedParameters.entry_id}
-                                          });
+                                          if (embedParams.isPlaylist === true) {
+                                              window['__thumbnailEmbed']({
+                                                  config: {...playerOptions},
+                                                  mediaInfo: {playlistId: embedParams.embedParameters.entry_id}
+                                              });
+                                          } else {
+                                                window['__thumbnailEmbed']({
+                                                    config: {...playerOptions},
+                                                    mediaInfo: {entryId: embedParams.embedParameters.entry_id}
+                                                });
+                                          }
                                       }
                                   } catch (e) {
                                       console.error(e.message)
@@ -115,7 +131,7 @@
                           document.body.appendChild(template.content.firstChild);
                           break;
                       case 'auto':
-                          const style = '<style>html, body {margin: 0; padding: 0; width: 100%; height: 100%; } #framePlayerContainer {display: flex; justify-content: center; }</style>';
+                          const style = '<style>html, body {margin: 0; padding: 0; width: 100%; height: 100%; } #framePlayerContainer {display: flex; justify-content: center; width: 100%; height: 100%;}</style>';
                           document.open();
                           document.write('<!doctype html><html><head>' + style + '</head><body><div id="framePlayerContainer">' + embedParams.htmlContent + '<script src="' + embedParams.scriptUrl + '"></' + 'script></div></body></html>');
                           document.close();

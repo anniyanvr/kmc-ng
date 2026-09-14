@@ -57,7 +57,7 @@
                            suggestionItemField="item"
                            suggestionLabelField="name"
                            suggestionSelectableField="isSelectable"
-                           [allowMultiple]="false"
+                           [allowMultiple]="true"
                            [minLength]="3"
                            [suggestionsProvider]="_categoriesProvider"
                            (completeMethod)="_searchCategories($event)">
@@ -85,7 +85,7 @@
                            suggestionItemField="item"
                            suggestionLabelField="name"
                            suggestionSelectableField="isSelectable"
-                           [allowMultiple]="false"
+                           [allowMultiple]="true"
                            [minLength]="3"
                            [suggestionsProvider]="_categoriesProvider"
                            (completeMethod)="_searchCategories($event)">
@@ -225,6 +225,24 @@
                         <a style="margin-left: 4px" (click)="openHelpLink()">{{'applications.settings.integrationSettings.zoom.here' | translate}}</a>
                     </kInputHelper>
                 </div>
+            </div>
+        </div>
+
+        <div class="kRow" style="align-items: flex-start">
+            <div class="kLabel">
+                <span>{{'applications.settings.integrationSettings.teams.findUserBy' | translate}}</span>
+            </div>
+            <div class="kRow" style="margin-bottom: 16px">
+                <p-radioButton name="userSearchMethod" [ngStyle]="{'marginLeft': '24px'}"
+                               [value]="0"
+                               (onClick)="sendUserSearchAnalytics(0)"
+                               formControlName="userSearchMethod"
+                               [label]="'applications.settings.myUserSettings.email' | translate"></p-radioButton>
+                <p-radioButton name="userSearchMethod" [ngStyle]="{'marginLeft': '24px'}"
+                               [value]="1"
+                               (onClick)="sendUserSearchAnalytics(1)"
+                               formControlName="userSearchMethod"
+                               [label]="'applications.settings.integrationSettings.teams.external' | translate"></p-radioButton>
             </div>
         </div>
 

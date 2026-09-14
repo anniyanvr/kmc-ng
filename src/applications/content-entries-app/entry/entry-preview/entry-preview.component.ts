@@ -38,6 +38,7 @@ export class EntryPreview implements OnInit, OnDestroy {
     public _previewDisabled = false;
     public _entryId = '';
     public _isImage = false;
+    public _isQuiz = false;
     public _loadThumbnailWithKs = false;
     public _thumbnailUrl = '';
     public _ks = '';
@@ -103,16 +104,9 @@ export class EntryPreview implements OnInit, OnDestroy {
             data => {
                 if (data) {
                     this._currentEntry = data;
-                    this._showPlayer = false;
-                    // force player reload
-                    setTimeout(() => {
-                        this._entryId = this._currentEntry.id;
-                        this._showPlayer = this._entryId.length && !this._isImage;
-                        if (this._showPlayer) {
-                            this.showPreview();
-                        }
-                    })
+                    this.reloadPlayer();
                     this._isImage = data.mediaType === KalturaMediaType.image;
+                    this._isQuiz = data.capabilities?.indexOf('quiz.quiz') > -1;
                     this._thumbnailUrl = data.thumbnailUrl + '/width/280';
                     const entryHasContent = this._currentEntry.status.toString() !== KalturaEntryStatus.noContent.toString();
 
@@ -128,17 +122,25 @@ export class EntryPreview implements OnInit, OnDestroy {
             .pipe(cancelOnDestroy(this))
             .subscribe(({entryId}) => {
                 if (this._currentEntry && this._currentEntry.id === entryId) {
-                    this._showPlayer = false;
-                    // force player reload
-                    setTimeout(() => {
-                        this._entryId = this._currentEntry.id;
-                        this._showPlayer = this._entryId.length && !this._isImage;
-                        if (this._showPlayer) {
-                            this.showPreview();
-                        }
-                    })
+                    this.reloadPlayer();
                 }
             });
+    }
+
+    private reloadPlayer(): void {
+        this._showPlayer = false;
+        // force player reload
+        setTimeout(() => {
+            this._entryId = this._currentEntry.id;
+            this._showPlayer = this._entryId.length && !this._isImage;
+            if (this._showPlayer) {
+                this.showPreview();
+            }
+        })
+    }
+
+    public pausePlayer(): void {
+        this.previewIframe.nativeElement.contentWindow.postMessage({'messageType': 'pause'}, window.location.origin);
     }
 
     private generateV3code(): string | EmbedParams {
@@ -150,8 +152,8 @@ export class EntryPreview implements OnInit, OnDestroy {
             ks,
             entryId: this._entryId,
             uiConfId,
-            width: 280,
-            height: 158,
+            width: '280px',
+            height: '158px',
             pid: this._appAuthentication.appUser.partnerId,
             serverUri: buildCDNUrl(''),
             playerConfig: ''

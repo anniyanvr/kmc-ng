@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import {AfterViewInit, Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import { AreaBlockerMessage, StickyComponent } from '@kaltura-ng/kaltura-ui';
 import { CategoriesStatusMonitorService, CategoriesStatus } from '../../categories-status/categories-status-monitor.service';
 import { EntriesFilters, EntriesStore, SortDirection } from 'app-shared/content-shared/entries/entries-store/entries-store.service';
@@ -17,6 +17,7 @@ import { MenuItem } from 'primeng/api';
 import { EntriesSearchFiltersComponent } from "app-shared/content-shared/entries/entries-search-filters/entries-search-filters.component";
 import { filter } from 'rxjs/operators';
 import { first } from 'rxjs/operators';
+import {AppBootstrap} from 'app-shared/kmc-shell';
 
 export interface CustomMenuItem extends MenuItem {
     metadata?: any;
@@ -30,9 +31,10 @@ export interface CustomMenuItem extends MenuItem {
   styleUrls: ['./entries-list.component.scss'],
     providers: [EntriesRefineFiltersService]
 })
-export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
+export class EntriesListComponent implements OnInit, OnDestroy, OnChanges, AfterViewInit {
     @Input() showReload = true;
     @Input() showExport = false;
+    @Input() isAIButtonVisible = false;
     @Input() selectedEntries: any[] = [];
     @Input() columns: EntriesTableColumns | null;
     @Input() rowActions: { label: string, commandName: string, styleClass: string }[];
@@ -68,11 +70,15 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
         sortBy: null,
         sortDirection: null,
         categories: [],
+        uncategorizedCategories: false,
         categoriesMode: null
     };
     public searchFieldsTooltip = '';
+    private destroyed = false;
+    private unMountBanner: () => void;
 
     constructor(public _entriesStore: EntriesStore,
+                private _bootstrapService: AppBootstrap,
                 private _entriesRefineFilters: EntriesRefineFiltersService,
                 private _appLocalization: AppLocalization,
                 private _analytics: AppAnalytics,
@@ -100,6 +106,23 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
         this._prepare();
     }
 
+    ngAfterViewInit() {
+        if (this._permissionsService.hasPermission(KMCPermissions.FEATURE_CONTENT_LAB)) {
+            this._bootstrapService.unisphereWorkspace$
+                .pipe(cancelOnDestroy(this))
+                .subscribe(unisphereWorkspace => {
+                    if (unisphereWorkspace) {
+                        unisphereWorkspace.getRuntimeAsync('unisphere.widget.content-lab', 'ai-consent').then(widget => {
+                            if (widget && !this.destroyed) {
+                                const {id, unsubscribe} = widget.mountVisual({type: 'banner', target: 'ai-consent-banner', settings: {}});
+                                this.unMountBanner = unsubscribe;
+                            }
+                        })
+                    }
+                });
+        }
+    }
+
     ngOnChanges(changes)
     {
         if (typeof changes.enforcedFilters !== 'undefined' && changes.enforcedFilters.currentValue)
@@ -120,20 +143,23 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
         const isPreviewCommand = commandName === 'preview';
         const isViewCommand = commandName === 'view';
         const isKalturaLive = (sourceType === KalturaSourceType.liveStream || sourceType === KalturaSourceType.manualLiveStream || sourceType === KalturaSourceType.akamaiLive || sourceType === KalturaSourceType.akamaiUniversalLive);
-        const isWebcast = isKalturaLive && entry.adminTags && entry.adminTags.indexOf('kms-webcast-event') !== -1;
         const isLiveDashboardCommand = commandName === 'liveDashboard';
         const isRealTimeAnalyticsCommand = commandName === 'realTimeAnalytics';
         const isWebcastAnalyticsCommand = commandName === 'webcastAnalytics';
         const cannotDeleteEntry = commandName === 'delete' && !this._permissionsService.hasPermission(KMCPermissions.CONTENT_MANAGE_DELETE);
         const isCaptionRequestCommand = commandName === 'captionRequest';
+        const isCaptionOrderCommand = commandName === 'captionOrder';
+        const isAudioOrderCommand = commandName === 'audioOrder';
         return !(
             (!isReadyStatus && isPreviewCommand) || // hide if trying to share & embed entry that isn't ready
             (!isReadyStatus && isLiveStreamFlash && isViewCommand) || // hide if trying to view live that isn't ready
             (isLiveDashboardCommand && !isKalturaLive) || // hide live-dashboard menu item for entry that isn't kaltura live
             (isRealTimeAnalyticsCommand && !isKalturaLive) || // hide real time analytics menu item for entry that isn't kaltura live
-            (isWebcastAnalyticsCommand && !isWebcast) || // hide webcast analytics menu item for entry that isn't kaltura live webcast
+            (isWebcastAnalyticsCommand && !isKalturaLive) || // hide webcast analytics menu item for entry that isn't kaltura live
             cannotDeleteEntry ||
-            (isCaptionRequestCommand && !this._reachAppViewService.isAvailable({ entry, page: ReachPages.entry })) // hide caption request if not audio/video or if it is then if not ready or it's forbidden by permission
+            (isCaptionRequestCommand && !this._reachAppViewService.isAvailable({ entry, page: ReachPages.entry })) ||
+            (isCaptionOrderCommand && !this._reachAppViewService.isAvailable({ entry, page: ReachPages.entry })) ||
+            (isAudioOrderCommand && !this._reachAppViewService.isAvailable({ entry, page: ReachPages.entry }))
         );
     }
 
@@ -293,6 +319,7 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
       'sortBy',
       'sortDirection',
       'categories',
+      'uncategorizedCategories',
       'categoriesMode'
     ]));
   }
@@ -330,6 +357,10 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
 
     if (typeof updates.categories !== 'undefined') {
       this._query.categories = [...updates.categories];
+    }
+
+    if (typeof updates.uncategorizedCategories !== 'undefined') {
+      this._query.uncategorizedCategories = updates.uncategorizedCategories || false;
     }
   }
 
@@ -410,7 +441,19 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   ngOnDestroy() {
+      this._bootstrapService.unisphereWorkspace$
+          .pipe(cancelOnDestroy(this))
+          .subscribe(unisphereWorkspace => {
+              if (unisphereWorkspace) {
+                  unisphereWorkspace.getRuntimeAsync('unisphere.widget.content-lab', 'ai-consent').then(widget => {
+                      if (this.unMountBanner) {
+                          this.unMountBanner();
+                      }
+                  })
+              }
+          });
       this.actionsMenu.hide();
+      this.destroyed = true;
   }
 
   public _reload() {
@@ -437,6 +480,10 @@ export class EntriesListComponent implements OnInit, OnDestroy, OnChanges {
       this._reload();
     }
   }
+
+    onUncategorizedSelected(selected :boolean): void {
+        this._entriesStore.filter({ uncategorizedCategories: selected });
+    }
 
     public applySearchFields(fields: {selectedSearchField: string, includeCaptions: boolean}): void {
         if (fields.selectedSearchField === 'all') {

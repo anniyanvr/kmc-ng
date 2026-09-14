@@ -6,26 +6,41 @@ import { of } from 'rxjs';
 import { AppLocalization } from '@kaltura-ng/mc-shared';
 import { IsUserExistsStatuses } from './user-exists-statuses';
 import { cancelOnDestroy, tag } from '@kaltura-ng/kaltura-common';
-import {KalturaAPIException, KalturaKeyValueExtended, KalturaUser, UserExportToCsvAction} from 'kaltura-ngx-client';
-import { KalturaUserRole } from 'kaltura-ngx-client';
-import { KalturaClient, KalturaMultiRequest } from 'kaltura-ngx-client';
-import { UserRoleListAction } from 'kaltura-ngx-client';
-import { KalturaUserRoleFilter } from 'kaltura-ngx-client';
-import { KalturaUserRoleStatus } from 'kaltura-ngx-client';
-import { KalturaUserRoleOrderBy } from 'kaltura-ngx-client';
-import { UserListAction } from 'kaltura-ngx-client';
-import { KalturaUserFilter } from 'kaltura-ngx-client';
-import { KalturaNullableBoolean } from 'kaltura-ngx-client';
-import { KalturaUserStatus } from 'kaltura-ngx-client';
-import { KalturaUserOrderBy } from 'kaltura-ngx-client';
-import { KalturaFilterPager } from 'kaltura-ngx-client';
-import { PartnerGetInfoAction } from 'kaltura-ngx-client';
-import { UserUpdateAction } from 'kaltura-ngx-client';
-import { UserDeleteAction } from 'kaltura-ngx-client';
-import { UserGetByLoginIdAction } from 'kaltura-ngx-client';
-import { UserGetAction } from 'kaltura-ngx-client';
-import { UserEnableLoginAction } from 'kaltura-ngx-client';
-import { UserAddAction } from 'kaltura-ngx-client';
+import {
+    ESearchSearchUserAction,
+    KalturaAPIException,
+    KalturaClient,
+    KalturaESearchItemType,
+    KalturaESearchOperatorType,
+    KalturaESearchUserFieldName,
+    KalturaESearchUserItem,
+    KalturaESearchUserOperator,
+    KalturaESearchUserParams,
+    KalturaFilterPager,
+    KalturaKeyValueExtended,
+    KalturaMultiRequest,
+    KalturaNullableBoolean,
+    KalturaPager,
+    KalturaUser,
+    KalturaUserFilter,
+    KalturaUserOrderBy,
+    KalturaUserRole,
+    KalturaUserRoleFilter,
+    KalturaUserRoleOrderBy,
+    KalturaUserRoleStatus,
+    KalturaUserStatus,
+    PartnerGetInfoAction,
+    UserAddAction,
+    UserDeleteAction,
+    UserDemoteAdminAction,
+    UserEnableLoginAction,
+    UserExportToCsvAction,
+    UserGetAction,
+    UserGetByLoginIdAction,
+    UserListAction,
+    UserRoleListAction,
+    UserUpdateAction,
+} from 'kaltura-ngx-client';
 import { AdminUsersMainViewService } from 'app-shared/kmc-shared/kmc-views';
 import { throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
@@ -107,7 +122,8 @@ export class UsersStore implements OnDestroy {
             statusEqual: KalturaUserRoleStatus.active,
             orderBy: KalturaUserRoleOrderBy.idAsc.toString(),
             tagsMultiLikeOr: 'kmc'
-          })
+          }),
+        pager: new KalturaFilterPager({ pageSize: 500, pageIndex: 0})
         }),
         new UserListAction({
           filter: new KalturaUserFilter({
@@ -230,6 +246,44 @@ export class UsersStore implements OnDestroy {
       }));
   }
 
+  public demoteUser(user: KalturaUser): Observable<void> {
+    const isCurrentUser = this.isCurrentUser(user);
+    const isAdminUser = this._usersDataValue && this._usersDataValue.partnerInfo.adminUserId === user.id;
+
+    if (isCurrentUser || isAdminUser) {
+      return throwError(new Error(this._appLocalization.get('applications.administration.users.cantPerform')));
+    }
+
+    return this._kalturaServerClient
+      .request(new UserDemoteAdminAction({ userId: user.id }))
+      .pipe(map(() => {
+        return;
+      }));
+  }
+
+    public isExternalUser(email: string): Observable<KalturaUser | null> {
+        const user = new KalturaESearchUserItem({
+            fieldName: KalturaESearchUserFieldName.externalId,
+            itemType: KalturaESearchItemType.exactMatch,
+            searchTerm: email,
+        });
+        const searchAnd = new KalturaESearchUserOperator({
+            operator: KalturaESearchOperatorType.andOp,
+            searchItems: [user],
+        });
+        const searchParams = new KalturaESearchUserParams({
+            objectStatuses: KalturaUserStatus.active.toString(),
+            searchOperator: searchAnd,
+        });
+        const pager = new KalturaPager();
+        return this._kalturaServerClient.request(new ESearchSearchUserAction({ searchParams, pager }))
+            .pipe(
+                cancelOnDestroy(this),
+                map(response => response.objects?.length > 0 ? response.objects[0].object as KalturaUser : null),
+                catchError(() => of(null))
+            );
+    }
+
   public isUserAlreadyExists(email: string): Observable<IsUserExistsStatuses | null> {
     return this._kalturaServerClient
       .request(new UserGetByLoginIdAction({ loginId: email }))
@@ -271,18 +325,16 @@ export class UsersStore implements OnDestroy {
         .pipe(map(() => {}));
   }
 
-  public updateUser(userData: { roleIds: string, id: string, email: string, ssoUser?: boolean}, userId: string): Observable<void> {
+  public updateUser(userData: { roleIds: string, id: string, email: string, ssoUser?: boolean}, userId: string, isHashedUserId = false): Observable<void> {
     const { roleIds, id, email } = userData;
 
     if ((!id && !email) || !userId || !roleIds) {
       return throwError(new Error(this._appLocalization.get('applications.administration.users.invalidUserId')));
     }
 
-    const user = new KalturaUser({
-      roleIds,
-      id: id || email,
-        email: email
-    });
+    const user = isHashedUserId ?
+        new KalturaUser({roleIds, email}) :
+        new KalturaUser({roleIds, id: id || email, email});
     if (userData.ssoUser !== undefined) {
         user.isSsoExcluded = !userData.ssoUser
     }
@@ -302,12 +354,14 @@ export class UsersStore implements OnDestroy {
       roleIds: roleIds,
       isAdmin: true
     });
-    const request = new KalturaMultiRequest(
-      new UserUpdateAction({ userId: user.id, user: updatedUser }),
-      new UserEnableLoginAction({ userId: user.id, loginId: userProvidedEmail })
-    );
+
+    const multiRequest = new KalturaMultiRequest();
+    multiRequest.requests.push(new UserUpdateAction({ userId: user.id, user: updatedUser }));
+    if (!user.loginEnabled) {
+        multiRequest.requests.push(new UserEnableLoginAction({userId: user.id, loginId: userProvidedEmail}));
+    }
     return this._kalturaServerClient
-      .multiRequest(request)
+      .multiRequest(multiRequest)
       .pipe(map((responses) => {
         if (responses.hasErrors()) {
           const errorMessage = responses.map(response => {
